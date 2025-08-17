@@ -36,6 +36,7 @@ body { background: #f7f9fc; }
 }
 .card { @apply bg-white rounded-xl shadow-md border border-gray-200; }
 
+img { image-rendering: -webkit-optimize-contrast; }
 
 *{box-sizing:border-box}
 html,body,#root{height:100%}
