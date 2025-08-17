@@ -3,6 +3,9 @@ export default {
   content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+        fontFamily: {
+            sans: ['"SF Pro"', "ui-sans-serif", "system-ui"],
+        },
       colors: {
         bg: "#f7f9fc",      // used as bg-bg
         card: "#ffffff",     // used as bg-card

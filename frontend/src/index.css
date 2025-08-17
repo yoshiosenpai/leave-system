@@ -1,178 +1,238 @@
-:root{
+@import "tailwindcss";
+
+/* =========================
+   1) SF Pro – self-hosted
+   ========================= */
+@font-face {
+  font-family: "SF Pro";
+  src: url("/src/assets/fonts/SF-Pro-Display-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SF Pro";
+  src: url("/src/assets/fonts/SF-Pro-Display-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SF Pro";
+  src: url("/src/assets/fonts/SF-Pro-Display-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* =========================
+   2) Design tokens
+   ========================= */
+:root {
+  /* Light UI palette for dashboard */
+  --app-bg: #f7f9fc;
+  --card-bg: #ffffff;
+  --border: #e5e7eb;
+  --text: #0f172a;         /* slate-900 */
+  --muted: #6b7280;        /* gray-500 */
+  --accent: #3b82f6;       /* blue-500 */
+
+  /* Your existing brand-ish tokens (kept for login glass + dark elements) */
   --bg: rgba(13, 25, 48, 0.6);
   --panel: rgba(17, 24, 39, 0.85);
   --panel-2: rgba(30, 41, 59, 0.85);
-  --text: #eef2f7;
-  --muted: #cbd5e1;
-  --primary: #6d7cff; /* violet */
+  --text-contrast: #eef2f7;
+  --muted-contrast: #cbd5e1;
+  --primary: #6d7cff;
   --primary-2: #8b98ff;
   --success: #22c55e;
   --warning: #eab308;
-  --danger:  #ef4444;
-  --ring: rgba(109,124,255,.35);
+  --danger: #ef4444;
+  --ring: rgba(109, 124, 255, 0.35);
 }
 
-@import "tailwindcss";
-/* tiny helpers for the login glass look */
-.login-glass {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.18);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-  background-image: radial-gradient(380px 220px at 50% 40%, rgba(124,58,237,.26), rgba(15,23,42,.65) 70%);
+/* =========================
+   3) Global resets
+   ========================= */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--app-bg); /* light app background */
+  color: var(--text);
+  font-family: "SF Pro", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
-@keyframes cardPulse { 0%{box-shadow:0 0 0 0 rgba(124,58,237,.28)} 70%{box-shadow:0 0 0 12px rgba(124,58,237,0)} 100%{box-shadow:0 0 0 0 rgba(124,58,237,0)} }
-.pulse { animation: cardPulse 1.8s ease-out infinite; }
-@keyframes spin { to { transform: rotate(360deg) } }
-.spin { animation: spin .9s linear infinite; }
+a { color: inherit; text-decoration: none; }
+input, select, button { font: inherit; color: inherit; }
+img { image-rendering: -webkit-optimize-contrast; }
 
-body { background: #f7f9fc; }
-/* Soft neumorphism panel for sidebar */
+/* =========================
+   4) Layout helpers
+   ========================= */
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+.row { display: grid; gap: 16px; }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* Notion-y top nav (if you still use it anywhere) */
+.nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+}
+.brand { display: flex; gap: 10px; align-items: center; font-weight: 700; letter-spacing: .5px; }
+
+/* =========================
+   5) Cards / badges / forms
+   ========================= */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
+}
+.card:hover {
+  transform: translateY(-1px);
+  transition: transform .15s ease, box-shadow .15s ease;
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.06);
+}
+.card h3 { margin: 0 0 8px; }
+
+.kpi { font-size: 28px; font-weight: 700; }
+.muted { color: var(--muted); font-size: 12px; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; padding: 6px 10px; border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+}
+
+/* Inputs matching the light style */
+.input,
+.select {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.input:focus,
+.select:focus {
+  border-color: rgba(59, 130, 246, 0.55);            /* blue-500 */
+  box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.18);    /* focus halo */
+  outline: none;
+}
+
+.form { display: grid; gap: 12px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.section-title { margin: 0 0 8px; font-size: 18px; }
+
+/* =========================
+   6) Buttons
+   ========================= */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(90deg, var(--primary), var(--primary-2));
+  border: none; color: white; padding: 10px 14px; border-radius: 10px; cursor: pointer;
+  transition: transform .12s ease, filter .2s ease, box-shadow .2s ease;
+  box-shadow: 0 8px 22px rgba(124, 58, 237, .18);
+}
+.btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.btn.ghost {
+  background: #fff; color: var(--text);
+  border: 1px solid var(--border); box-shadow: none;
+}
+.btn.danger {
+  background: linear-gradient(180deg, #ef4444, #f87171);
+  box-shadow: 0 8px 22px rgba(239, 68, 68, .18);
+}
+
+/* =========================
+   7) Calendar bits (mini)
+   ========================= */
+.calendar { display: grid; gap: 8px; }
+.calendar .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.dow, .day { text-align: center; padding: 8px 0; border-radius: 8px; }
+.dow { color: var(--muted); font-size: 12px; }
+.day {
+  background: #fff;
+  border: 1px solid var(--border);
+}
+.day.today { outline: 2px solid rgba(59, 130, 246, .6); outline-offset: -2px; }
+.empty { opacity: .65; }
+hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
+
+/* =========================
+   8) Soft panel (sidebar)
+   ========================= */
 .soft-panel {
   background: linear-gradient(180deg, #eaf3ff, #f7fbff);
   box-shadow:
     6px 6px 14px rgba(0,0,0,.06),
     -6px -6px 14px rgba(255,255,255,.6);
 }
-.card { @apply bg-white rounded-xl shadow-md border border-gray-200; }
 
-img { image-rendering: -webkit-optimize-contrast; }
-
-*{box-sizing:border-box}
-html,body,#root{height:100%}
-body{
-  margin:0; background:linear-gradient(180deg,#0a0f1c,#0b1220 40%);
-  color:var(--text); font-family: Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
-}
-
-.panel {
-  background: var(--panel);
-  backdrop-filter: blur(10px); /* “glassmorphism” effect */
-  border: 1px solid rgba(255,255,255,0.05);
-}
-
-a{color:inherit; text-decoration:none}
-input,select,button{
-  font:inherit; color:inherit;
-}
-
-.container{max-width:1100px; margin:0 auto; padding:24px}
-.nav{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:16px 24px; background:rgba(255,255,255,.02); backdrop-filter: blur(6px);
-  border-bottom:1px solid rgba(255,255,255,.05); position: sticky; top:0; z-index:10;
-}
-.brand{display:flex; gap:10px; align-items:center; font-weight:700; letter-spacing:.5px}
-.row{display:grid; gap:16px}
-.grid-3{grid-template-columns: repeat(3, minmax(0,1fr))}
-.card{
-  background: rgba(20, 26, 44, 0.55);  
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 16px;
-  backdrop-filter: blur(12px) saturate(1.1);
-  box-shadow: 0 20px 60px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06);
-}
-
-.card:hover{transform: translateY(-2px); border-color: rgba(124,58,237,.35); box-shadow: 0 16px 40px rgba(124,58,237,.12);}
-.card h3{margin:0 0 8px}
-.kpi{font-size:28px; font-weight:700}
-.muted{color:var(--muted); font-size:12px}
-
-.btn{
-  display:inline-flex; align-items:center; gap:8px;
-  background:linear-gradient(180deg,var(--primary),var(--primary-2));
-  border:none; color:white; padding:10px 14px; border-radius:10px; cursor:pointer;
-  transition: transform .12s ease, filter .2s ease, box-shadow .2s ease;
-  box-shadow: 0 8px 22px rgba(124,58,237,.28);
-}
-.btn:hover{transform: translateY(-1px); filter: brightness(1.05)}
-.btn.ghost{
-  background: transparent; border:1px solid rgba(255,255,255,.12); box-shadow:none;
-}
-.btn.danger{background:linear-gradient(180deg,#ef4444,#f87171); box-shadow: 0 8px 22px rgba(239,68,68,.25);}
-.input, .select{
-  background: rgba(8, 12, 24, 0.55);
-  border: 1px solid rgba(255,255,255,0.10);
-}
-.input:focus, .select:focus {
-  border-color: rgba(99,102,241,.55);
-  box-shadow: 0 0 0 6px rgba(99,102,241,.18);
-}
-
-.form-row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
-.form{display:grid; gap:12px}
-.section-title{margin:0 0 8px; font-size:18px}
-
-.calendar{
-  display:grid; gap:8px;
-}
-.calendar .grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px}
-.day, .dow{
-  text-align:center; padding:8px 0; border-radius:8px;
-}
-.dow{color:var(--muted); font-size:12px}
-.day{background: rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06)}
-.day.today{border-color: var(--ring)}
-.badge{
-  display:inline-flex; align-items:center; gap:6px;
-  font-size:12px; padding:6px 10px; border-radius:999px;
-  border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.04)
-}
-.empty{opacity:.65}
-hr{border:0; border-top:1px solid rgba(255,255,255,.06); margin:16px 0}
-
-/* --- Login Glass Card --- */
-.login-card{
-  position: relative;
-  width: 420px;                /* tweak for your layout */
-  padding: 24px;
-  border-radius: 20px;
-  color: var(--text);
-
-  /* glass base */
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.18);
+/* =========================
+   9) Login – glassmorphism
+   ========================= */
+.login-glass {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   backdrop-filter: blur(12px) saturate(160%);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
-  box-shadow: 0 12px 36px rgba(0,0,0,.35);
-
-  /* radial highlight (center glow) */
   background-image: radial-gradient(
     380px 220px at 50% 40%,
-    rgba(124,58,237,.26),
-    rgba(15,23,42,.65) 70%
+    rgba(124, 58, 237, .26),
+    rgba(15, 23, 42, .65) 70%
   );
 }
 
-/* optional: subtle lift on hover */
-.login-card:hover{
+.login-card {
+  position: relative;
+  width: 420px;
+  padding: 24px;
+  border-radius: 20px;
+  color: var(--text-contrast);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .35);
+  background-image: radial-gradient(
+    380px 220px at 50% 40%,
+    rgba(124, 58, 237, .26),
+    rgba(15, 23, 42, .65) 70%
+  );
+}
+.login-card:hover {
   transform: translateY(-2px);
   transition: transform .18s ease, box-shadow .18s ease;
-  box-shadow: 0 18px 50px rgba(0,0,0,.40);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .40);
 }
 
-/* --- Login Inputs --- */
-.login-input{
+.login-input {
   width: 100%;
   padding: 10px 12px;
   margin-top: 6px;
   border-radius: 12px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.2);
-  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-contrast);
   outline: none;
   backdrop-filter: blur(6px);
   transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
 }
-.login-input::placeholder{ color: rgba(255,255,255,.55); }
-.login-input:focus{
+.login-input::placeholder { color: rgba(255, 255, 255, .55); }
+.login-input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 6px var(--ring);
-  background: rgba(255,255,255,0.10);
+  background: rgba(255, 255, 255, 0.10);
 }
 
-/* --- Login Button --- */
-.login-btn{
+.login-btn {
   width: 100%;
   padding: 10px 14px;
   border: 0;
@@ -182,21 +242,21 @@ hr{border:0; border-top:1px solid rgba(255,255,255,.06); margin:16px 0}
   cursor: pointer;
   font-weight: 600;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  box-shadow: 0 10px 28px rgba(124,58,237,.28);
+  box-shadow: 0 10px 28px rgba(124, 58, 237, .28);
   transition: transform .15s ease, filter .2s ease, box-shadow .2s ease;
 }
-.login-btn:hover{ transform: translateY(-1px); filter: brightness(1.05); }
-.login-btn:active{ transform: translateY(0); filter: brightness(.98); }
+.login-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.login-btn:active { transform: translateY(0); filter: brightness(.98); }
 
-
-/* soft animated glow that follows focus/hover */
+/* =========================
+   10) Animations
+   ========================= */
 @keyframes cardPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(124,58,237,.28); }
-  70%  { box-shadow: 0 0 0 12px rgba(124,58,237,0); }
-  100% { box-shadow: 0 0 0 0 rgba(124,58,237,0); }
+  0%   { box-shadow: 0 0 0 0 rgba(124, 58, 237, .28); }
+  70%  { box-shadow: 0 0 0 12px rgba(124, 58, 237, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
 }
-.login-card.pulse { animation: cardPulse 1.8s ease-out infinite; }
+.pulse { animation: cardPulse 1.8s ease-out infinite; }
 
-/* spinner (you already used .spin, keep for button icons) */
 @keyframes spin { to { transform: rotate(360deg);} }
 .spin { animation: spin .9s linear infinite; }
