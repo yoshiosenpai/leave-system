@@ -3,54 +3,53 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth";
 import { myLeaves, allLeaves, createLeave, approve, reject, metrics } from "../api";
 import {
-  CalendarDays,
   LayoutDashboard,
   ClipboardList,
-  Check,
-  X,
+  CalendarDays,
+  UserPlus,
   LogOut,
   RefreshCcw,
-  UserPlus,
+  Check,
+  X,
   Search
 } from "lucide-react";
 
-/** ---------- Small helpers ---------- */
+/* ---------- Little helpers ---------- */
+function cls(...xs) { return xs.filter(Boolean).join(" "); }
 function useToday() {
   const d = new Date();
   return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
 }
 
-function cls(...xs) {
-  return xs.filter(Boolean).join(" ");
-}
-
-/** ---------- Sidebar ---------- */
+/* ---------- Sidebar ---------- */
 function Sidebar() {
   const { user, logout } = useAuth();
   return (
-    <aside className="w-64 shrink-0 soft-panel p-4 h-screen sticky top-0 overflow-y-auto">
+    <aside className="w-68 shrink-0 h-screen sticky top-0 overflow-y-auto soft-panel p-5">
+      {/* Brand */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="h-9 w-9 rounded-xl bg-white shadow-inset grid place-items-center">📄</div>
-        <div className="font-semibold">Leave System</div>
+        <div className="h-9 w-9 rounded-2xl bg-white shadow-md grid place-items-center">📄</div>
+        <div className="font-semibold text-slate-800">Leave System</div>
       </div>
 
-      <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Pages</div>
+      {/* Sections */}
+      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Pages</div>
       <nav className="flex flex-col gap-1">
         <NavItem icon={LayoutDashboard} label="Dashboard" active />
         <NavItem icon={ClipboardList} label="My Leaves" />
         {user?.role === "ADMIN" && <NavItem icon={UserPlus} label="Register" />}
       </nav>
 
-      <div className="mt-6 text-xs uppercase tracking-wide text-slate-500 mb-2">Account</div>
+      <div className="mt-6 text-[11px] uppercase tracking-wide text-slate-500 mb-2">Account</div>
       <button
         onClick={logout}
-        className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/60 text-slate-700 transition-colors"
+        className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/70 text-slate-700 transition-colors"
       >
         <LogOut size={18} /> <span className="text-[14px]">Logout</span>
       </button>
 
-      <div className="mt-8 text-xs text-slate-500">
-        v1 • {user?.name} · {user?.role}
+      <div className="mt-8 text-[12px] text-slate-500">
+        v1 · {user?.name} · {user?.role}
       </div>
     </aside>
   );
@@ -60,34 +59,34 @@ function NavItem({ icon: Icon, label, active }) {
   return (
     <div
       className={cls(
-        "flex items-center gap-3 px-3 py-2 rounded-xl transition-colors",
-        active ? "bg-white text-slate-900" : "hover:bg-white/60 text-slate-700"
+        "flex items-center gap-3 px-3 py-2 rounded-xl text-[14px]",
+        active ? "bg-white text-slate-900 shadow-sm" : "hover:bg-white/70 text-slate-700"
       )}
     >
       <Icon size={18} />
-      <span className="text-[14px]">{label}</span>
+      <span>{label}</span>
     </div>
   );
 }
 
-/** ---------- Topbar ---------- */
+/* ---------- Top bar (Notion-like) ---------- */
 function Topbar() {
   return (
-    <div className="sticky top-0 z-10 bg-bg/80 backdrop-blur border-b border-border">
-      <div className="h-14 flex items-center justify-between px-6">
+    <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200">
+      <div className="h-14 px-6 flex items-center justify-between">
         <div className="relative">
-          <Search className="absolute left-2 top-2.5 text-slate-400" size={16} />
+          <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
           <input
-            className="pl-8 pr-3 py-2 rounded-lg bg-white border border-border text-sm"
+            className="pl-9 pr-3 py-2 rounded-lg bg-white border border-gray-200 text-sm w-72 focus:ring-2 focus:ring-blue-400 outline-none"
             placeholder="Search…"
           />
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-xs text-slate-500 hidden md:block">📊 Strategic Dashboard</div>
+          <span className="text-sm text-slate-500 hidden sm:block">📊 Strategic Dashboard</span>
           <img
-            src={`https://api.dicebear.com/8.x/thumbs/svg?seed=user`}
+            src="https://api.dicebear.com/8.x/thumbs/svg?seed=user"
+            className="h-8 w-8 rounded-xl border border-gray-200"
             alt=""
-            className="h-8 w-8 rounded-xl border border-border"
           />
         </div>
       </div>
@@ -95,7 +94,7 @@ function Topbar() {
   );
 }
 
-/** ---------- Calendar (mini) ---------- */
+/* ---------- Mini Calendar ---------- */
 function CalendarMini({ items = [] }) {
   const { y, m, d } = useToday();
   const first = new Date(y, m, 1).getDay();
@@ -113,27 +112,30 @@ function CalendarMini({ items = [] }) {
   });
 
   const dows = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
   return (
-    <div className="card p-4">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
       <div className="flex items-center justify-between mb-2">
-        <div className="font-medium">Calendar</div>
+        <div className="font-medium text-slate-800">Calendar</div>
         <span className="text-xs text-slate-500 flex items-center gap-1">
           <CalendarDays size={14} />
           {new Date(y, m, 1).toLocaleString(undefined, { month: "long", year: "numeric" })}
         </span>
       </div>
-      <div className="grid grid-cols-7 gap-1 text-xs text-slate-500 mb-1">
+
+      <div className="grid grid-cols-7 gap-1 text-[12px] text-slate-500 mb-1">
         {dows.map((x) => (
           <div key={x} className="text-center py-1">{x}</div>
         ))}
       </div>
+
       <div className="grid grid-cols-7 gap-1">
         {cells.map((v, i) => (
           <div
             key={i}
             className={cls(
-              "h-10 rounded-lg border border-border bg-white grid place-items-center",
-              v === d ? "ring-2 ring-accent/70" : "",
+              "h-10 rounded-lg border border-gray-200 bg-white grid place-items-center text-sm",
+              v === d ? "ring-2 ring-blue-400" : "",
               v && hasLeave.has(v) ? "bg-blue-50 border-blue-200 text-blue-700" : ""
             )}
           >
@@ -145,18 +147,18 @@ function CalendarMini({ items = [] }) {
   );
 }
 
-/** ---------- Metric Card ---------- */
-function MetricCard({ label, value, hint }) {
+/* ---------- Small KPI Card ---------- */
+function StatCard({ label, value, hint }) {
   return (
-    <div className="card p-4">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
       <div className="text-slate-500 text-sm">{label}</div>
-      <div className="text-3xl font-semibold mt-1">{value}</div>
+      <div className="text-3xl font-semibold mt-1 text-slate-900">{value}</div>
       {hint && <div className="text-xs text-slate-400 mt-1">{hint}</div>}
     </div>
   );
 }
 
-/** ---------- Main Dashboard ---------- */
+/* ---------- Main ---------- */
 export default function Dashboard() {
   const { token, user } = useAuth();
 
@@ -165,9 +167,8 @@ export default function Dashboard() {
   const [stat, setStat] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // form state
   const today = new Date().toISOString().slice(0, 10);
-  const [mode, setMode] = useState("single"); // 'single' | 'range'
+  const [mode, setMode] = useState("single");
   const [form, setForm] = useState({
     startDate: today,
     endDate: today,
@@ -193,23 +194,15 @@ export default function Dashboard() {
     }
   }
 
-  useEffect(() => {
-    if (token) refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  useEffect(() => { if (token) refresh(); /* eslint-disable-line */ }, [token]);
 
   async function submitLeave(e) {
     e.preventDefault();
     const payload = { ...form };
     if (mode === "single") payload.endDate = payload.startDate;
-
     const r = await createLeave(token, payload);
-    if (r?.id) {
-      setForm((f) => ({ ...f, reason: "" }));
-      refresh();
-    } else {
-      alert("Submit failed: " + JSON.stringify(r));
-    }
+    if (r?.id) { setForm((f) => ({ ...f, reason: "" })); refresh(); }
+    else alert("Submit failed: " + JSON.stringify(r));
   }
 
   async function act(id, action) {
@@ -218,50 +211,45 @@ export default function Dashboard() {
     refresh();
   }
 
-  const kpis = useMemo(
-    () => [
-      { label: "My Leaves", value: mine.length, hint: "updated just now" },
-      ...(user?.role === "ADMIN"
-        ? [
-            { label: "Pending", value: Number(stat.pending || 0) },
-            { label: "Approved", value: Number(stat.approved || 0) },
-          ]
-        : []),
-    ],
-    [mine, stat, user]
-  );
+  const kpis = useMemo(() => ([
+    { label: "My Leaves", value: mine.length, hint: "updated just now" },
+    ...(user?.role === "ADMIN"
+      ? [
+          { label: "Pending", value: Number(stat.pending || 0) },
+          { label: "Approved", value: Number(stat.approved || 0) },
+        ]
+      : []),
+  ]), [mine, stat, user]);
 
   return (
-    <div className="flex">
-      {/* Left */}
+    <div className="flex bg-[#f7f9fc] min-h-screen text-slate-800">
+      {/* Left: Sidebar */}
       <Sidebar />
 
-      {/* Right */}
-      <main className="flex-1 min-h-screen bg-bg">
+      {/* Right: Content */}
+      <main className="flex-1">
         <Topbar />
 
-        <div className="px-6 py-6">
-          {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            {kpis.map((k) => (
-              <MetricCard key={k.label} {...k} />
-            ))}
+        <div className="px-6 py-6 space-y-6">
+          {/* KPI row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {kpis.map((k) => <StatCard key={k.label} {...k} />)}
           </div>
 
           {/* Apply + Calendar */}
           <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6">
-            {/* Apply */}
-            <section className="card p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="font-medium">Apply Leave</div>
+            {/* Apply Form */}
+            <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="font-medium">📝 Apply Leave</div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setMode("single")}
                     className={cls(
-                      "px-3 py-1.5 rounded-lg border",
+                      "px-3 py-1.5 rounded-lg border text-sm",
                       mode === "single"
-                        ? "bg-slate-800 text-white border-slate-800"
-                        : "bg-white border-border"
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white border-gray-200"
                     )}
                   >
                     Single Day
@@ -269,10 +257,10 @@ export default function Dashboard() {
                   <button
                     onClick={() => setMode("range")}
                     className={cls(
-                      "px-3 py-1.5 rounded-lg border",
+                      "px-3 py-1.5 rounded-lg border text-sm",
                       mode === "range"
-                        ? "bg-slate-800 text-white border-slate-800"
-                        : "bg-white border-border"
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white border-gray-200"
                     )}
                   >
                     Range
@@ -280,16 +268,14 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <form onSubmit={submitLeave} className="grid md:grid-cols-2 gap-3">
+              <form onSubmit={submitLeave} className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-slate-500">Start date</label>
                   <input
                     type="date"
-                    className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2"
+                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2"
                     value={form.startDate}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, startDate: e.target.value }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
                     required
                   />
                 </div>
@@ -299,11 +285,9 @@ export default function Dashboard() {
                   </label>
                   <input
                     type="date"
-                    className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 disabled:opacity-60"
+                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 disabled:opacity-60"
                     value={form.endDate}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, endDate: e.target.value }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
                     required
                     disabled={mode === "single"}
                   />
@@ -311,11 +295,9 @@ export default function Dashboard() {
                 <div>
                   <label className="text-sm text-slate-500">Type</label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2"
+                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2"
                     value={form.type}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, type: e.target.value }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
                   >
                     <option>ANNUAL</option>
                     <option>SICK</option>
@@ -325,21 +307,20 @@ export default function Dashboard() {
                 <div>
                   <label className="text-sm text-slate-500">Reason</label>
                   <input
-                    className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2"
+                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2"
                     placeholder="Optional"
                     value={form.reason}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, reason: e.target.value }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
                   />
                 </div>
-                <div className="col-span-full flex gap-2">
-                  <button className="px-4 py-2 rounded-lg bg-accent text-white flex items-center gap-2">
+
+                <div className="col-span-full flex flex-wrap gap-2">
+                  <button className="px-4 py-2 rounded-lg bg-blue-600 text-white flex items-center gap-2">
                     <Check size={16} /> Submit
                   </button>
                   <button
                     type="button"
-                    className="px-4 py-2 rounded-lg border border-border bg-white flex items-center gap-2"
+                    className="px-4 py-2 rounded-lg border border-gray-200 bg-white flex items-center gap-2"
                     onClick={refresh}
                   >
                     <RefreshCcw size={16} /> Refresh
@@ -349,19 +330,16 @@ export default function Dashboard() {
 
               {/* My Leaves */}
               <div className="mt-6">
-                <div className="font-medium mb-2">My Leaves</div>
+                <div className="font-medium mb-3">📋 My Leaves</div>
                 <div className="space-y-2">
-                  {mine.length === 0 && (
-                    <div className="text-sm text-slate-500">No leaves yet.</div>
-                  )}
+                  {mine.length === 0 && <div className="text-sm text-slate-500">No leaves yet.</div>}
                   {mine.map((l) => (
-                    <div key={l.id} className="border border-border rounded-xl bg-white px-3 py-2">
+                    <div key={l.id} className="border border-gray-200 rounded-xl bg-white px-3 py-2">
                       <div className="text-sm">
                         <b>{l.type}</b> · {l.start_date} → {l.end_date}
                       </div>
                       <div className="text-xs text-slate-500">
-                        Status: {l.status}
-                        {l.manager_comment ? ` · ${l.manager_comment}` : ""}
+                        Status: {l.status}{l.manager_comment ? ` · ${l.manager_comment}` : ""}
                       </div>
                     </div>
                   ))}
@@ -373,17 +351,15 @@ export default function Dashboard() {
             <section className="space-y-6">
               <CalendarMini items={mine} />
               {user?.role === "ADMIN" && (
-                <div className="card p-4">
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium">Pending Approvals</div>
+                    <div className="font-medium">✅ Pending Approvals</div>
                     <span className="text-xs text-slate-500">{pending.length} pending</span>
                   </div>
                   <div className="space-y-2">
-                    {pending.length === 0 && (
-                      <div className="text-sm text-slate-500">Nothing pending.</div>
-                    )}
+                    {pending.length === 0 && <div className="text-sm text-slate-500">Nothing pending.</div>}
                     {pending.map((l) => (
-                      <div key={l.id} className="border border-border rounded-xl bg-white px-3 py-2">
+                      <div key={l.id} className="border border-gray-200 rounded-xl bg-white px-3 py-2">
                         <div className="flex items-center justify-between text-sm">
                           <div>
                             <b>#{l.id}</b> {l.employee_name} · {l.type} · {l.start_date}→{l.end_date}
@@ -411,9 +387,9 @@ export default function Dashboard() {
             </section>
           </div>
 
-          {/* Simple timeline strip (optional) */}
-          <section className="card p-4 mt-6">
-            <div className="font-medium mb-3">Plan Timeline</div>
+          {/* Timeline (Notion-like strip) */}
+          <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="font-medium mb-3">🗓️ Plan Timeline</div>
             <div className="grid grid-cols-12 gap-2">
               {Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} className="text-center text-xs text-slate-400">
@@ -421,20 +397,18 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-            <div className="mt-2 space-y-2">
+            <div className="mt-3 space-y-2">
               <div className="h-3 rounded-full bg-blue-100 relative">
-                <div className="absolute left-[10%] right-[40%] top-0 bottom-0 bg-accent rounded-full"></div>
+                <div className="absolute left-[8%] right-[40%] top-0 bottom-0 bg-blue-500 rounded-full"></div>
               </div>
               <div className="h-3 rounded-full bg-emerald-100 relative">
-                <div className="absolute left-[45%] right-[5%] top-0 bottom-0 bg-emerald-500 rounded-full"></div>
+                <div className="absolute left-[45%] right-[6%] top-0 bottom-0 bg-emerald-500 rounded-full"></div>
               </div>
             </div>
           </section>
         </div>
 
-        {loading && (
-          <div className="fixed inset-0 bg-black/10 backdrop-blur-sm" />
-        )}
+        {loading && <div className="fixed inset-0 bg-black/10 backdrop-blur-sm" />}
       </main>
     </div>
   );
