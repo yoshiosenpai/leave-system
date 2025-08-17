@@ -1,35 +1,63 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useAuth } from "../auth";
-import { myLeaves, allLeaves, createLeave, approve, reject, metrics } from "../api";
+// src/pages/Dashboard.jsx
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
-  LayoutDashboard,
-  ClipboardList,
-  UserPlus,
-  RefreshCcw,
+  allLeaves,
+  approve,
+  createLeave,
+  metrics,
+  myLeaves,
+  reject,
+} from "../api";
+import { useAuth } from "../auth";
+import {
+  CalendarIcon,
   Check,
+  Loader2,
   X,
-  Search,
-  LogOut,
-  CalendarDays,
+  LogOut as LogoutIcon,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Search,
+  UserRound,
+  ShieldCheck,
 } from "lucide-react";
+import cls from "classnames";
 
-/* ---------------- helpers ---------------- */
-function cls(...xs) { return xs.filter(Boolean).join(" "); }
-function useToday() { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth(), dnum: d.getDate() }; }
-const avatarFrom = (seed) => `https://api.dicebear.com/8.x/thumbs/svg?seed=${encodeURIComponent(seed || "user")}`;
-function monthLabel(y, m) { return new Date(y, m, 1).toLocaleString(undefined, { month: "long", year: "numeric" }); }
-function shiftMonth(y, m, delta) {
-  const d = new Date(y, m + delta, 1);
-  return { y: d.getFullYear(), m: d.getMonth() };
+/* --------------------------------- Helpers -------------------------------- */
+
+function formatISO(d) {
+  return new Date(d).toISOString().slice(0, 10);
+}
+function startOfMonth(date) {
+  const d = new Date(date);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function endOfMonth(date) {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + 1, 0);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+function within(date, s, e) {
+  const t = new Date(date).getTime();
+  return t >= s.getTime() && t <= e.getTime();
 }
 
-/* ---------------- shared button ---------------- */
-function AButton({ variant = "primary", className = "", children, ...rest }) {
+/* -------------------------- Reusable/Atomic pieces ------------------------- */
+
+function AButton({
+  variant = "primary",
+  className = "",
+  loading = false,
+  children,
+  ...rest
+}) {
   const base =
     "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 " +
-    "focus:outline-none focus:ring-2 focus:ring-blue-400 hover:scale-[1.02] active:scale-[0.98]";
+    "focus:outline-none focus:ring-2 focus:ring-blue-400 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60";
   const theme =
     variant === "primary"
       ? "bg-gradient-to-r from-sky-400 to-blue-500 text-white hover:from-sky-500 hover:to-blue-600 hover:shadow-md"
@@ -37,549 +65,730 @@ function AButton({ variant = "primary", className = "", children, ...rest }) {
       ? "bg-rose-500 text-white hover:shadow-md"
       : "bg-white border border-gray-200 hover:shadow-sm";
   return (
-    <button className={cls(base, theme, className)} {...rest}>
+    <button className={cls(base, theme, className)} disabled={loading} {...rest}>
+      {loading && <Loader2 className="animate-spin" size={16} />}
       {children}
     </button>
   );
 }
 
-/* ---------------- Modal ---------------- */
-function Modal({ open, title, onClose, children }) {
-  if (!open) return null;
+function StatCard({ title, value }) {
   return (
-    <div className="fixed inset-0 z-[200] bg-black/30 backdrop-blur-sm grid place-items-center p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white border border-gray-200 shadow-xl">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-          <div className="font-medium">{title}</div>
-          <button className="text-slate-500 hover:text-slate-700" onClick={onClose}>✕</button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+      <div className="text-sm text-gray-500">{title}</div>
+      <div className="mt-2 text-3xl font-semibold">{value}</div>
+      <div className="text-xs text-gray-400 mt-1">updated just now</div>
     </div>
   );
 }
 
-/* ---------------- Sidebar ---------------- */
-function Sidebar({ onGotoTop, onGotoMine, onGotoRegister }) {
-  const { user } = useAuth();
-  const avatar = avatarFrom(user?.email || user?.name);
-
+function Section({ title, right, children }) {
   return (
-    <aside className="w-68 shrink-0 h-screen sticky top-0 overflow-y-auto soft-panel p-5">
-      {/* Profile */}
-      <div className="flex items-center gap-3 mb-6">
-        <img src={avatar} alt="" className="h-10 w-10 rounded-xl border border-white/60 shadow" />
-        <div>
-          <div className="text-xs text-slate-500">Welcome</div>
-          <div className="font-semibold text-slate-800">{user?.name || user?.email}</div>
-          <div className="text-[11px] text-slate-500">ID: {user?.id ?? "-"}</div>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <CalendarIcon size={16} className="text-slate-400" />
+          <h3 className="font-semibold">{title}</h3>
         </div>
+        {right}
       </div>
-
-      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Pages</div>
-      <nav className="flex flex-col gap-1">
-        <NavItem icon={LayoutDashboard} label="Dashboard" onClick={onGotoTop} />
-        <NavItem icon={ClipboardList} label="My Leaves" onClick={onGotoMine} />
-        {user?.role === "ADMIN" && (
-          <NavItem icon={UserPlus} label="Register" onClick={onGotoRegister} />
-        )}
-      </nav>
-
-      <div className="mt-8 text-[12px] text-slate-500">v1 • {user?.role}</div>
-    </aside>
-  );
-}
-
-function NavItem({ icon: Icon, label, onClick }) {
-  return (
-    <button
-      className={cls(
-        "flex items-center gap-3 px-3 py-2 rounded-xl text-[14px] text-left",
-        "hover:bg-white/70 text-slate-700"
-      )}
-      onClick={onClick}
-    >
-      <Icon size={18} />
-      <span>{label}</span>
-    </button>
-  );
-}
-
-/* ---------------- Topbar ---------------- */
-function Topbar() {
-  const { logout, user } = useAuth();
-  const avatar = avatarFrom(user?.email || user?.name);
-
-  return (
-    <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200">
-      <div className="h-14 px-6 flex items-center justify-between">
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
-          <input
-            className="pl-9 pr-3 py-2 rounded-lg bg-white border border-gray-200 text-sm w-72 focus:ring-2 focus:ring-blue-400 outline-none"
-            placeholder="Search…"
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden sm:inline text-sm text-slate-500">📊 Strategic Dashboard</span>
-          <img src={avatar} alt="" className="h-8 w-8 rounded-xl border border-gray-200" />
-          <AButton variant="ghost" className="!px-3" onClick={logout}>
-            <LogOut size={18} /> Logout
-          </AButton>
-        </div>
-      </div>
+      {children}
     </div>
   );
 }
 
-/* ---------------- Company Calendar with month nav ---------------- */
-function CompanyCalendar({ y, m, monthLeaves, onPrev, onNext, onDayClick }) {
-  const today = useToday();
-  const first = new Date(y, m, 1).getDay();
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const cells = [];
-  for (let i = 0; i < first; i++) cells.push(null);
-  for (let i = 1; i <= daysInMonth; i++) cells.push(i);
+/* ----------------------------- Calendar (mini) ----------------------------- */
+
+function CalendarMini({ items = [] }) {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const today = d.getDate();
+  const first = new Date(y, m, 1).getDay(); // 0 = Sun
+  const days = new Date(y, m + 1, 0).getDate();
+
+  const cells = Array.from({ length: first }, () => null).concat(
+    Array.from({ length: days }, (_, i) => i + 1)
+  );
+
+  const marked = new Set();
+  items.forEach((l) => {
+    const s = new Date(l.start_date);
+    const e = new Date(l.end_date);
+    for (let dt = new Date(s); dt <= e; dt.setDate(dt.getDate() + 1)) {
+      if (dt.getMonth() === m && dt.getFullYear() === y)
+        marked.add(dt.getDate());
+    }
+  });
 
   const dows = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+    <div>
       <div className="flex items-center justify-between mb-2">
-        <div className="font-medium text-slate-800">Calendar</div>
-        <div className="flex items-center gap-1">
-          <AButton variant="ghost" className="!px-2 border" onClick={onPrev} aria-label="Previous month">
-            <ChevronLeft size={18} />
-          </AButton>
-          <span className="text-xs text-slate-500 flex items-center gap-1 min-w-[140px] justify-center">
-            <CalendarDays size={14} />
-            {monthLabel(y, m)}
-          </span>
-          <AButton variant="ghost" className="!px-2 border" onClick={onNext} aria-label="Next month">
-            <ChevronRight size={18} />
-          </AButton>
-        </div>
+        <h3 className="font-semibold">Calendar</h3>
+        <span className="text-xs text-gray-500">
+          {new Date(y, m, 1).toLocaleString(undefined, {
+            month: "long",
+            year: "numeric",
+          })}
+        </span>
       </div>
-
-      <div className="grid grid-cols-7 gap-1 text-[12px] text-slate-500 mb-1">
-        {dows.map((x) => (
-          <div key={x} className="text-center py-1">{x}</div>
+      <div className="grid grid-cols-7 gap-2 text-center text-xs text-gray-500">
+        {dows.map((d) => (
+          <div key={d}>{d}</div>
         ))}
       </div>
-
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((v, idx) => {
-          const list = v ? (monthLeaves[v] || []) : [];
-          const isToday = v && y === today.y && m === today.m && v === today.dnum;
-          return (
-            <button
-              key={idx}
-              className={cls(
-                "min-h-[46px] rounded-lg border border-gray-200 bg-white px-1 pt-1 text-left",
-                "transition-colors hover:bg-blue-50",
-                isToday && "ring-2 ring-blue-400"
-              )}
-              onClick={() => v && onDayClick(v, list)}
-              disabled={!v}
-              title={list.length ? `${list.length} on leave` : ""}
-            >
-              <div className="text-center text-sm">{v ?? ""}</div>
-              {v && list.length > 0 && (
-                <div className="flex -space-x-2 mt-1 pl-1">
-                  {list.slice(0, 3).map((p, i) => (
-                    <img key={i} src={p.avatar} className="h-5 w-5 rounded-full border border-white" alt="" />
-                  ))}
-                  {list.length > 3 && (
-                    <div className="h-5 px-2 rounded-full bg-blue-100 text-blue-700 text-[10px] grid place-items-center border border-white">
-                      +{list.length - 3}
-                    </div>
-                  )}
-                </div>
-              )}
-            </button>
-          );
-        })}
+      <div className="mt-2 grid grid-cols-7 gap-2">
+        {cells.map((v, i) => (
+          <div
+            key={i}
+            className={cls(
+              "h-10 rounded-lg flex items-center justify-center border text-sm",
+              v === null
+                ? "border-transparent"
+                : "bg-white hover:bg-sky-50 border-gray-200",
+              v === today && "ring-2 ring-sky-300",
+              v && marked.has(v) && "bg-sky-50 border-sky-200"
+            )}
+          >
+            {v ?? ""}
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-/* ---------------- Dashboard ---------------- */
+/* --------------------------- Calendar Overview UI -------------------------- */
+
+function CalendarOverviewModal({
+  open,
+  onClose,
+  monthDate,
+  setMonthDate,
+  rows,
+  onDayClick,
+}) {
+  if (!open) return null;
+
+  const y = monthDate.getFullYear();
+  const m = monthDate.getMonth();
+  const first = new Date(y, m, 1).getDay();
+  const days = new Date(y, m + 1, 0).getDate();
+  const cells = Array.from({ length: first }, () => null).concat(
+    Array.from({ length: days }, (_, i) => i + 1)
+  );
+
+  const dows = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="absolute inset-0 grid place-items-center p-4">
+        <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b">
+            <div className="flex items-center gap-2 text-lg font-semibold">
+              <CalendarIcon size={18} />
+              Team Leave Overview
+            </div>
+            <div className="flex items-center gap-2">
+              <AButton
+                variant="ghost"
+                className="!px-2"
+                onClick={() =>
+                  setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
+                }
+              >
+                <ChevronLeft size={18} />
+              </AButton>
+              <div className="text-sm text-gray-600 min-w-[120px] text-center">
+                {monthDate.toLocaleString(undefined, {
+                  month: "long",
+                  year: "numeric",
+                })}
+              </div>
+              <AButton
+                variant="ghost"
+                className="!px-2"
+                onClick={() =>
+                  setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
+                }
+              >
+                <ChevronRight size={18} />
+              </AButton>
+              <AButton variant="ghost" className="!px-2" onClick={onClose}>
+                <X size={18} />
+              </AButton>
+            </div>
+          </div>
+
+          <div className="p-5">
+            <div className="grid grid-cols-7 gap-2 text-center text-xs text-gray-500">
+              {dows.map((d) => (
+                <div key={d}>{d}</div>
+              ))}
+            </div>
+            <div className="mt-2 grid grid-cols-7 gap-2">
+              {cells.map((v, i) => {
+                const date = v
+                  ? new Date(y, m, v)
+                  : null;
+                const onClick = () => v && onDayClick(date);
+                const count = v
+                  ? rows.filter((r) =>
+                      within(
+                        date,
+                        new Date(r.start_date),
+                        new Date(r.end_date)
+                      )
+                    ).length
+                  : 0;
+
+              return (
+                <button
+                  key={i}
+                  disabled={!v}
+                  onClick={onClick}
+                  className={cls(
+                    "h-16 rounded-lg flex flex-col items-center justify-center border text-sm relative",
+                    v
+                      ? "bg-white hover:bg-sky-50 border-gray-200"
+                      : "border-transparent cursor-default"
+                  )}
+                >
+                  {v ?? ""}
+                  {count > 0 && (
+                    <span className="absolute bottom-1 text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 border border-sky-200">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            </div>
+
+            {/* Legend */}
+            <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded bg-sky-100 border border-sky-200"></span>
+                Day(s) with leave
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------- Page ---------------------------------- */
+
 export default function Dashboard() {
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
 
   const [mine, setMine] = useState([]);
   const [pending, setPending] = useState([]);
   const [stat, setStat] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // Month navigation state (defaults to current month)
-  const { y: ty, m: tm } = useToday();
-  const [viewYear, setViewYear] = useState(ty);
-  const [viewMonth, setViewMonth] = useState(tm);
-
-  // We cache all approved leaves once; then filter per month quickly on the client
-  const [approvedAll, setApprovedAll] = useState([]);
-  const [approvedMonthMap, setApprovedMonthMap] = useState({}); // {day: [{name, avatar, type}]}
-
-  // Modal state for day details
-  const [dayModal, setDayModal] = useState({ open: false, day: null, list: [] });
-
-  // refs for in-page navigation
-  const topRef = useRef(null);
-  const myLeavesRef = useRef(null);
-  const registerRef = useRef(null);
-
-  const today = new Date().toISOString().slice(0, 10);
+  const todayStr = formatISO(new Date());
   const [mode, setMode] = useState("single");
-  const [form, setForm] = useState({ startDate: today, endDate: today, type: "ANNUAL", reason: "" });
+  const [form, setForm] = useState({
+    startDate: todayStr,
+    endDate: todayStr,
+    type: "ANNUAL",
+    reason: "",
+  });
 
-  function onDayClick(day, list) {
-    setDayModal({ open: true, day, list });
-  }
-
-  // Build map for a given y/m from a list of approved leaves
-  function buildMonthMap(list, y, m) {
-    const map = {};
-    list.forEach((l) => {
-      const s = new Date(l.start_date);
-      const e = new Date(l.end_date);
-      for (let dt = new Date(s); dt <= e; dt.setDate(dt.getDate() + 1)) {
-        if (dt.getMonth() === m && dt.getFullYear() === y) {
-          const d = dt.getDate();
-          map[d] ||= [];
-          map[d].push({
-            name: l.employee_name || l.employee || l.email || "Employee",
-            avatar: avatarFrom(l.employee_name || l.employee || l.email),
-            type: l.type
-          });
-        }
-      }
-    });
-    return map;
-  }
-
-  async function refresh() {
-    setLoading(true);
-    try {
-      const mineRes = await myLeaves(token);
-      setMine(mineRes);
-
-      // Pull all approved once
-      const approved = await allLeaves(token, { status: "APPROVED" });
-      setApprovedAll(approved);
-
-      if (user?.role === "ADMIN") {
-        const [pend, stats] = await Promise.all([
-          allLeaves(token, { status: "PENDING" }),
-          metrics(token),
-        ]);
-        setPending(pend);
-        setStat(stats);
-      } else {
-        setPending([]);
-        setStat({});
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Initial load
-  useEffect(() => { if (token) refresh(); /* eslint-disable-line */ }, [token]);
-
-  // Recompute the month map whenever approvedAll or (viewYear, viewMonth) changes
-  useEffect(() => {
-    setApprovedMonthMap(buildMonthMap(approvedAll, viewYear, viewMonth));
-  }, [approvedAll, viewYear, viewMonth]);
-
-  async function submitLeave(e) {
-    e.preventDefault();
-    const payload = { ...form };
-    if (mode === "single") payload.endDate = payload.startDate;
-    const r = await createLeave(token, payload);
-    if (r?.id) { setForm((f) => ({ ...f, reason: "" })); refresh(); }
-    else alert("Submit failed: " + JSON.stringify(r));
-  }
-
-  async function act(id, action) {
-    if (action === "approve") await approve(token, id, "Approved");
-    else await reject(token, id, "Rejected");
-    refresh();
-  }
+  // Calendar overview modal state
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [overviewMonth, setOverviewMonth] = useState(startOfMonth(new Date()));
+  const [overviewRows, setOverviewRows] = useState([]);
+  const [overviewForDay, setOverviewForDay] = useState(null); // selected date
 
   const kpis = useMemo(
     () => [
-      { label: "My Leaves", value: mine.length, hint: "updated just now" },
+      { title: "My Leaves", value: mine.length },
       ...(user?.role === "ADMIN"
         ? [
-            { label: "Pending", value: Number(stat.pending || 0) },
-            { label: "Approved", value: Number(stat.approved || 0) },
+            { title: "Pending", value: Number(stat.pending || 0) },
+            { title: "Approved", value: Number(stat.approved || 0) },
           ]
         : []),
     ],
     [mine, stat, user]
   );
 
-  const gotoPrevMonth = () => {
-    const { y, m } = shiftMonth(viewYear, viewMonth, -1);
-    setViewYear(y); setViewMonth(m);
-  };
-  const gotoNextMonth = () => {
-    const { y, m } = shiftMonth(viewYear, viewMonth, 1);
-    setViewYear(y); setViewMonth(m);
-  };
+  async function refresh() {
+    try {
+      setLoading(true);
+      const [my, pend, met] = await Promise.all([
+        myLeaves(token),
+        user?.role === "ADMIN"
+          ? allLeaves(token, { status: "PENDING" })
+          : Promise.resolve([]),
+        user?.role === "ADMIN" ? metrics(token) : Promise.resolve({}),
+      ]);
+      setMine(my || []);
+      setPending(pend || []);
+      setStat(met || {});
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Initial load
+  useEffect(() => {
+    if (token) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // Load overview data for a month (with fallback filter)
+  async function loadOverviewForMonth(d) {
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const s = startOfMonth(d);
+    const e = endOfMonth(d);
+
+    try {
+      setLoading(true);
+      // Try server-side query by month (if your API supports it)
+      let rows = await allLeaves(token, { month: ym });
+      if (!Array.isArray(rows) || rows.length === 0) {
+        // Fallback: get ALL pending/approved and filter client-side
+        const any = await allLeaves(token, { status: "ANY" }).catch(() => []);
+        rows = (any || []).filter((r) =>
+          // if range intersects the month
+          !(new Date(r.end_date) < s || new Date(r.start_date) > e)
+        );
+      }
+      setOverviewRows(rows || []);
+    } catch (e) {
+      console.error(e);
+      setOverviewRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // When month changes in modal
+  useEffect(() => {
+    if (overviewOpen) loadOverviewForMonth(overviewMonth);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overviewOpen, overviewMonth]);
+
+  async function submitLeave(e) {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const payload = { ...form };
+      if (mode === "single") payload.endDate = payload.startDate;
+      const r = await createLeave(token, payload);
+      if (r?.id) {
+        setForm((f) => ({ ...f, reason: "" }));
+        await refresh();
+      } else {
+        alert("Failed to create leave.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function act(id, type) {
+    try {
+      setLoading(true);
+      if (type === "approve") await approve(token, id, "Approved");
+      else await reject(token, id, "Rejected");
+      await refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* --------------------------------- Render -------------------------------- */
 
   return (
-    <div className="flex bg-[#f7f9fc] min-h-screen text-slate-800">
-      {/* Sidebar with working navigation */}
-      <Sidebar
-        onGotoTop={() => topRef.current?.scrollIntoView({ behavior: "smooth" })}
-        onGotoMine={() => myLeavesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-        onGotoRegister={() => registerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-      />
+    <div className="relative min-h-screen flex bg-[#f7f9fc]">
+      {/* Sidebar */}
+      <aside className="w-72 border-r border-gray-200 bg-gradient-to-b from-sky-50 to-white">
+        <div className="p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-white border border-gray-200 grid place-items-center">
+            <ShieldCheck className="text-sky-500" size={18} />
+          </div>
+          <div>
+            <div className="text-sm text-gray-500">Welcome</div>
+            <div className="font-semibold leading-tight">
+              {user?.name || "Employee"}
+            </div>
+            <div className="text-xs text-gray-400">
+              ID: {user?.id ?? "-"} • {user?.role ?? "-"}
+            </div>
+          </div>
+        </div>
 
-      {/* Right/content */}
-      <main className="flex-1">
-        <Topbar />
+        <nav className="mt-3 px-2 space-y-1">
+          <Link
+            to="/"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700"
+          >
+            📊 <span>Dashboard</span>
+          </Link>
+          <Link
+            to="/my-leaves"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700"
+          >
+            🗂 <span>Leave Applications</span>
+          </Link>
+          <Link
+            to="/register"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700"
+          >
+            ➕ <span>Register</span>
+          </Link>
+        </nav>
+      </aside>
 
-        <div ref={topRef} className="px-6 py-6 space-y-6">
-          {/* KPI row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {kpis.map((k) => (
-              <div key={k.label} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                <div className="text-slate-500 text-sm">{k.label}</div>
-                <div className="text-3xl font-semibold mt-1 text-slate-900">{k.value}</div>
-                {k.hint && <div className="text-xs text-slate-400 mt-1">{k.hint}</div>}
+      {/* Main */}
+      <main className="flex-1 relative">
+        {/* Top bar */}
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+            <div className="flex-1 max-w-md">
+              <div className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg">
+                <Search size={16} className="text-gray-400" />
+                <input
+                  className="w-full outline-none text-sm bg-transparent"
+                  placeholder="Search…"
+                />
               </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <AButton
+                variant="ghost"
+                className="bg-white border border-gray-200"
+                onClick={() => setOverviewOpen(true)}
+                title="Open Calendar Overview"
+              >
+                <CalendarIcon size={16} />
+                Strategic Dashboard
+              </AButton>
+              <AButton
+                variant="ghost"
+                className="bg-white border border-gray-200"
+                onClick={logout}
+              >
+                <LogoutIcon size={16} />
+                Logout
+              </AButton>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+          {/* Plan Timeline (TOP) */}
+          <Section
+            title="Plan Timeline"
+            right={
+              <div className="flex items-center gap-4 text-xs text-gray-500">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded bg-blue-100 border border-blue-300" />
+                  Company Plan
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300" />
+                  My Leaves
+                </div>
+              </div>
+            }
+          >
+            <div className="space-y-2">
+              <div className="h-2 rounded-full bg-blue-100" />
+              <div
+                className="h-2 rounded-full bg-emerald-200"
+                style={{ width: "85%" }}
+              />
+            </div>
+          </Section>
+
+          {/* KPIs */}
+          <div className="grid md:grid-cols-3 gap-4">
+            {kpis.map((k) => (
+              <StatCard key={k.title} title={k.title} value={k.value} />
             ))}
           </div>
 
-          {/* ---- Plan Timeline + legend (top) ---- */}
-          <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="font-medium">🗓️ Plan Timeline</div>
-              <div className="flex items-center gap-3 text-xs">
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-2.5 w-6 rounded-full bg-blue-500"></span> Blue: Product roadmap
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-2.5 w-6 rounded-full bg-emerald-500"></span> Green: HR / Ops
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-12 gap-2">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="text-center text-xs text-slate-400">
-                  {new Date(0, i).toLocaleString(undefined, { month: "short" })}
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 space-y-2">
-              <div className="h-3 rounded-full bg-blue-100 relative">
-                <div className="absolute left-[8%] right-[40%] top-0 bottom-0 bg-blue-500 rounded-full"></div>
-              </div>
-              <div className="h-3 rounded-full bg-emerald-100 relative">
-                <div className="absolute left-[45%] right-[6%] top-0 bottom-0 bg-emerald-500 rounded-full"></div>
-              </div>
-            </div>
-          </section>
+          {/* Apply Leave + Calendar */}
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Apply Leave form (span 2) */}
+            <div className="lg:col-span-2 space-y-6">
+              <Section
+                title="Apply Leave"
+                right={
+                  <div className="flex gap-2">
+                    <AButton
+                      variant={mode === "single" ? "primary" : "ghost"}
+                      onClick={() => setMode("single")}
+                    >
+                      Single Day
+                    </AButton>
+                    <AButton
+                      variant={mode === "range" ? "primary" : "ghost"}
+                      onClick={() => setMode("range")}
+                    >
+                      Range
+                    </AButton>
+                  </div>
+                }
+              >
+                <form onSubmit={submitLeave} className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-gray-500">Start date</label>
+                      <input
+                        type="date"
+                        value={form.startDate}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, startDate: e.target.value }))
+                        }
+                        className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">
+                        End date (auto = start)
+                      </label>
+                      <input
+                        type="date"
+                        value={form.endDate}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, endDate: e.target.value }))
+                        }
+                        className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 disabled:opacity-70"
+                        required
+                        disabled={mode === "single"}
+                      />
+                    </div>
+                  </div>
 
-          {/* Apply + Calendar Overview */}
-          <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6">
-            {/* Apply form + My Leaves */}
-            <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="font-medium">📝 Apply Leave</div>
-                <div className="flex gap-2">
-                  <AButton
-                    variant={mode === "single" ? "primary" : "ghost"}
-                    onClick={() => setMode("single")}
-                    className={mode === "single" ? "!px-3 !py-1.5" : "border"}
-                  >
-                    Single Day
-                  </AButton>
-                  <AButton
-                    variant={mode === "range" ? "primary" : "ghost"}
-                    onClick={() => setMode("range")}
-                    className={mode === "range" ? "!px-3 !py-1.5" : "border"}
-                  >
-                    Range
-                  </AButton>
-                </div>
-              </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-gray-500">Type</label>
+                      <select
+                        value={form.type}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, type: e.target.value }))
+                        }
+                        className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                      >
+                        <option>ANNUAL</option>
+                        <option>SICK</option>
+                        <option>UNPAID</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Reason</label>
+                      <input
+                        value={form.reason}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, reason: e.target.value }))
+                        }
+                        placeholder="Optional"
+                        className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                      />
+                    </div>
+                  </div>
 
-              <form onSubmit={submitLeave} className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-slate-500">Start date</label>
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2"
-                    value={form.startDate}
-                    onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-slate-500">
-                    End date {mode === "single" && <span className="text-slate-400">(auto = start)</span>}
-                  </label>
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 disabled:opacity-60"
-                    value={form.endDate}
-                    onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
-                    required
-                    disabled={mode === "single"}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-slate-500">Type</label>
-                  <select
-                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2"
-                    value={form.type}
-                    onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                  >
-                    <option>ANNUAL</option>
-                    <option>SICK</option>
-                    <option>UNPAID</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm text-slate-500">Reason</label>
-                  <input
-                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2"
-                    placeholder="Optional"
-                    value={form.reason}
-                    onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-                  />
-                </div>
+                  <div className="flex items-center gap-3">
+                    <AButton type="submit" loading={loading}>
+                      <Check size={16} />
+                      Submit
+                    </AButton>
+                    <AButton
+                      variant="ghost"
+                      onClick={refresh}
+                      loading={loading}
+                    >
+                      Refresh
+                    </AButton>
+                  </div>
+                </form>
+              </Section>
 
-                <div className="col-span-full flex flex-wrap gap-2">
-                  <AButton type="submit"><Check size={16}/> Submit</AButton>
-                  <AButton variant="ghost" className="border" type="button" onClick={refresh}>
-                    <RefreshCcw size={16}/> Refresh
-                  </AButton>
-                </div>
-              </form>
-
-              {/* Leave Applications */}
-              <div ref={myLeavesRef} className="mt-6">
-                <div className="font-medium mb-3">📋 Leave Application</div>
-                <div className="space-y-2">
-                  {mine.length === 0 && <div className="text-sm text-slate-500">No leaves yet.</div>}
+              {/* My Leaves */}
+              <Section title="My Leaves">
+                <div className="space-y-3">
+                  {mine.length === 0 && (
+                    <div className="text-sm text-gray-500">No leaves yet.</div>
+                  )}
                   {mine.map((l) => (
-                    <div key={l.id} className="border border-gray-200 rounded-xl bg-white px-3 py-2">
+                    <div
+                      key={l.id}
+                      className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center justify-between"
+                    >
                       <div className="text-sm">
                         <b>{l.type}</b> · {l.start_date} → {l.end_date}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        Status: {l.status}{l.manager_comment ? ` · ${l.manager_comment}` : ""}
+                        <div className="text-xs text-gray-500">
+                          Status: {l.status}
+                          {l.manager_comment ? ` · ${l.manager_comment}` : ""}
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            </section>
+              </Section>
+            </div>
 
-            {/* Right column: Overview + Pending */}
-            <section className="space-y-6">
-              <CompanyCalendar
-                y={viewYear}
-                m={viewMonth}
-                monthLeaves={approvedMonthMap}
-                onPrev={gotoPrevMonth}
-                onNext={gotoNextMonth}
-                onDayClick={onDayClick}
-              />
+            {/* Right column: Calendar + Pending approvals */}
+            <div className="space-y-6">
+              <Section
+                title="Calendar"
+                right={
+                  <AButton variant="ghost" onClick={() => setOverviewOpen(true)}>
+                    Team Overview
+                  </AButton>
+                }
+              >
+                <CalendarMini items={mine} />
+              </Section>
 
               {user?.role === "ADMIN" && (
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium">✅ Pending Approvals</div>
-                    <span className="text-xs text-slate-500">{pending.length} pending</span>
-                  </div>
-                  <div className="space-y-2">
-                    {pending.length === 0 && <div className="text-sm text-slate-500">Nothing pending.</div>}
+                <Section
+                  title="Pending Approvals"
+                  right={
+                    <span className="text-xs text-gray-500">
+                      {pending.length} pending
+                    </span>
+                  }
+                >
+                  <div className="space-y-3">
+                    {pending.length === 0 && (
+                      <div className="text-sm text-gray-500">Nothing pending.</div>
+                    )}
                     {pending.map((l) => (
-                      <div key={l.id} className="border border-gray-200 rounded-xl bg-white px-3 py-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <div>
-                            <b>#{l.id}</b> {l.employee_name} · {l.type} · {l.start_date}→{l.end_date}
-                          </div>
-                          <div className="flex gap-2">
-                            <AButton variant="primary" onClick={() => act(l.id, "approve")}><Check size={14}/>Approve</AButton>
-                            <AButton variant="danger" onClick={() => act(l.id, "reject")}><X size={14}/>Reject</AButton>
-                          </div>
+                      <div
+                        key={l.id}
+                        className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center justify-between"
+                      >
+                        <div className="text-sm">
+                          <b>#{l.id}</b> {l.employee_name} · {l.type} ·{" "}
+                          {l.start_date} → {l.end_date}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <AButton onClick={() => act(l.id, "approve")}>
+                            <Check size={16} /> Approve
+                          </AButton>
+                          <AButton
+                            variant="danger"
+                            onClick={() => act(l.id, "reject")}
+                          >
+                            <X size={16} /> Reject
+                          </AButton>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
+                </Section>
               )}
-            </section>
+            </div>
           </div>
-
-          {/* Admin: Register panel (anchor for sidebar). Hook it to your real API when ready */}
-          {user?.role === "ADMIN" && (
-            <section ref={registerRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-              <div className="font-medium mb-3">👤 Register Employee</div>
-              <p className="text-sm text-slate-500 mb-3">
-                This is a placeholder form to wire up to your admin API.
-              </p>
-              <form
-                className="grid md:grid-cols-2 gap-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const fd = new FormData(e.currentTarget);
-                  const data = Object.fromEntries(fd.entries());
-                  console.log("Register payload:", data);
-                  alert("Registration form submitted (demo). Wire this to your admin API.");
-                }}
-              >
-                <input name="name" placeholder="Full name" className="px-3 py-2 border border-gray-200 rounded-lg" />
-                <input name="email" placeholder="Email" className="px-3 py-2 border border-gray-200 rounded-lg" />
-                <select name="role" className="px-3 py-2 border border-gray-200 rounded-lg">
-                  <option value="EMPLOYEE">EMPLOYEE</option>
-                  <option value="ADMIN">ADMIN</option>
-                </select>
-                <input name="password" type="password" placeholder="Temp password" className="px-3 py-2 border border-gray-200 rounded-lg" />
-                <div className="col-span-full">
-                  <AButton type="submit"><UserPlus size={16}/> Create</AButton>
-                </div>
-              </form>
-            </section>
-          )}
-
         </div>
-
-        {loading && <div className="fixed inset-0 bg-black/10 backdrop-blur-sm" />}
       </main>
 
-      {/* Day details modal */}
-      <Modal
-        open={dayModal.open}
-        title={
-          `Leave on ${dayModal.day ?? ""} ${monthLabel(viewYear, viewMonth)}`
-        }
-        onClose={() => setDayModal({ open: false, day: null, list: [] })}
-      >
-        {dayModal.list.length === 0 ? (
-          <div className="text-sm text-slate-600">No one is on leave this day.</div>
-        ) : (
-          <div className="space-y-3">
-            {dayModal.list.map((p, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <img src={p.avatar} className="h-8 w-8 rounded-full border border-gray-200" alt="" />
-                <div className="text-sm">
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-xs text-slate-500">{p.type}</div>
-                </div>
-              </div>
-            ))}
+      {/* Full-page loading overlay (covers topbar/side) */}
+      {loading && (
+        <>
+          <div className="fixed inset-0 z-40 bg-white/40 backdrop-blur-sm" />
+          <div className="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+            <div className="flex items-center gap-3 text-slate-700">
+              <Loader2 className="animate-spin" size={28} />
+              <span className="font-medium">Refreshing…</span>
+            </div>
           </div>
-        )}
-      </Modal>
+        </>
+      )}
+
+      {/* Calendar Overview Modal */}
+      <CalendarOverviewModal
+        open={overviewOpen}
+        onClose={() => {
+          setOverviewOpen(false);
+          setOverviewForDay(null);
+        }}
+        monthDate={overviewMonth}
+        setMonthDate={setOverviewMonth}
+        rows={overviewRows}
+        onDayClick={(date) => {
+          // show a simple inline list for the selected day:
+          setOverviewForDay(date);
+          // You can fancy this up into another nested modal if you want.
+          const s = startOfMonth(date);
+          const e = endOfMonth(date);
+          console.debug(
+            "Selected day:",
+            date.toDateString(),
+            "Range of month:", s, e
+          );
+        }}
+      />
+
+      {/* Tiny popover-style panel for the selected day (if chosen) */}
+      {overviewOpen && overviewForDay && (
+        <div className="fixed bottom-5 right-5 z-50 w-[380px] bg-white rounded-xl shadow-xl border border-gray-200">
+          <div className="px-4 py-3 border-b flex items-center justify-between">
+            <div className="text-sm font-semibold">
+              {overviewForDay.toLocaleDateString()}
+            </div>
+            <button
+              className="text-gray-400 hover:text-gray-600"
+              onClick={() => setOverviewForDay(null)}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="p-3 space-y-2 max-h-[280px] overflow-auto">
+            {overviewRows
+              .filter((r) =>
+                within(
+                  overviewForDay,
+                  new Date(r.start_date),
+                  new Date(r.end_date)
+                )
+              )
+              .map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-2 text-sm bg-sky-50 border border-sky-200 rounded-lg px-2 py-1"
+                >
+                  <UserRound className="text-sky-600" size={16} />
+                  <div className="truncate">
+                    <b>{r.employee_name ?? `#${r.employee_id ?? r.id}`}</b> —{" "}
+                    <span className="uppercase">{r.type}</span>{" "}
+                    <span className="text-gray-500">
+                      ({r.start_date} → {r.end_date})
+                    </span>
+                  </div>
+                </div>
+              ))}
+            {/* empty state */}
+            {overviewRows.filter((r) =>
+              within(
+                overviewForDay,
+                new Date(r.start_date),
+                new Date(r.end_date)
+              )
+            ).length === 0 && (
+              <div className="text-xs text-gray-500">No one on leave.</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
