@@ -8,6 +8,12 @@ import {
   metrics,
   myLeaves,
   reject,
+  // NEW:
+  updateLeave,
+  deleteLeave,
+  registerEmployee,
+  updateProfile,
+  changePassword,
 } from "../api";
 import { useAuth } from "../auth";
 import {
@@ -21,10 +27,16 @@ import {
   Search,
   UserRound,
   ShieldCheck,
+  PencilLine,
+  Trash2,
+  Bell,
+  UserPlus2,
+  UserCircle2,
 } from "lucide-react";
-import cls from "classnames";
 
 /* --------------------------------- Helpers -------------------------------- */
+// tiny classnames
+const cls = (...p) => p.filter(Boolean).join(" ");
 
 function formatISO(d) {
   return new Date(d).toISOString().slice(0, 10);
@@ -99,7 +111,7 @@ function Section({ title, right, children }) {
 
 /* ----------------------------- Calendar (mini) ----------------------------- */
 
-function CalendarMini({ items = [] }) {
+function CalendarMini({ items = [], onDateClick }) {
   const d = new Date();
   const y = d.getFullYear();
   const m = d.getMonth();
@@ -140,21 +152,26 @@ function CalendarMini({ items = [] }) {
         ))}
       </div>
       <div className="mt-2 grid grid-cols-7 gap-2">
-        {cells.map((v, i) => (
-          <div
+        {cells.map((v, i) => {
+          const clickable = v !== null;
+          const date = clickable ? new Date(y, m, v) : null;
+        return (
+          <button
             key={i}
+            disabled={!clickable}
+            onClick={() => clickable && onDateClick?.(date)}
             className={cls(
               "h-10 rounded-lg flex items-center justify-center border text-sm",
-              v === null
-                ? "border-transparent"
+              !clickable
+                ? "border-transparent cursor-default"
                 : "bg-white hover:bg-sky-50 border-gray-200",
               v === today && "ring-2 ring-sky-300",
               v && marked.has(v) && "bg-sky-50 border-sky-200"
             )}
           >
             {v ?? ""}
-          </div>
-        ))}
+          </button>
+        )})}
       </div>
     </div>
   );
@@ -179,7 +196,6 @@ function CalendarOverviewModal({
   const cells = Array.from({ length: first }, () => null).concat(
     Array.from({ length: days }, (_, i) => i + 1)
   );
-
   const dows = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
@@ -234,10 +250,7 @@ function CalendarOverviewModal({
             </div>
             <div className="mt-2 grid grid-cols-7 gap-2">
               {cells.map((v, i) => {
-                const date = v
-                  ? new Date(y, m, v)
-                  : null;
-                const onClick = () => v && onDayClick(date);
+                const date = v ? new Date(y, m, v) : null;
                 const count = v
                   ? rows.filter((r) =>
                       within(
@@ -247,38 +260,60 @@ function CalendarOverviewModal({
                       )
                     ).length
                   : 0;
-
-              return (
-                <button
-                  key={i}
-                  disabled={!v}
-                  onClick={onClick}
-                  className={cls(
-                    "h-16 rounded-lg flex flex-col items-center justify-center border text-sm relative",
-                    v
-                      ? "bg-white hover:bg-sky-50 border-gray-200"
-                      : "border-transparent cursor-default"
-                  )}
-                >
-                  {v ?? ""}
-                  {count > 0 && (
-                    <span className="absolute bottom-1 text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 border border-sky-200">
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={i}
+                    disabled={!v}
+                    onClick={() => v && onDayClick?.(date)}
+                    className={cls(
+                      "h-16 rounded-lg flex flex-col items-center justify-center border text-sm relative",
+                      v ? "bg-white hover:bg-sky-50 border-gray-200" : "border-transparent cursor-default"
+                    )}
+                  >
+                    {v ?? ""}
+                    {count > 0 && (
+                      <span className="absolute bottom-1 text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 border border-sky-200">
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Legend */}
             <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded bg-sky-100 border border-sky-200"></span>
+                <span className="w-3 h-3 rounded bg-sky-100 border border-sky-200" />
                 Day(s) with leave
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------- Small popups ----------------------------- */
+
+function ModalShell({ open, title, icon, onClose, children, footer }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="absolute inset-0 grid place-items-center p-4">
+        <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-4 border-b flex items-center justify-between">
+            <div className="flex items-center gap-2 font-semibold">
+              {icon}
+              {title}
+            </div>
+            <button className="text-gray-400 hover:text-gray-600" onClick={onClose}>
+              <X size={18} />
+            </button>
+          </div>
+          <div className="p-5">{children}</div>
+          {footer && <div className="px-5 py-4 border-t">{footer}</div>}
         </div>
       </div>
     </div>
@@ -309,6 +344,16 @@ export default function Dashboard() {
   const [overviewMonth, setOverviewMonth] = useState(startOfMonth(new Date()));
   const [overviewRows, setOverviewRows] = useState([]);
   const [overviewForDay, setOverviewForDay] = useState(null); // selected date
+
+  // Popups: Notifications, Register Employee, Profile
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  // Edit/Delete state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editLeave, setEditLeave] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const kpis = useMemo(
     () => [
@@ -355,14 +400,11 @@ export default function Dashboard() {
 
     try {
       setLoading(true);
-      // Try server-side query by month (if your API supports it)
       let rows = await allLeaves(token, { month: ym });
       if (!Array.isArray(rows) || rows.length === 0) {
-        // Fallback: get ALL pending/approved and filter client-side
         const any = await allLeaves(token, { status: "ANY" }).catch(() => []);
-        rows = (any || []).filter((r) =>
-          // if range intersects the month
-          !(new Date(r.end_date) < s || new Date(r.start_date) > e)
+        rows = (any || []).filter(
+          (r) => !(new Date(r.end_date) < s || new Date(r.start_date) > e)
         );
       }
       setOverviewRows(rows || []);
@@ -409,6 +451,38 @@ export default function Dashboard() {
     }
   }
 
+  // Save edit
+  async function saveEdit() {
+    if (!editLeave) return;
+    try {
+      setLoading(true);
+      await updateLeave(token, editLeave.id, {
+        startDate: editLeave.start_date.slice(0,10),
+        endDate: editLeave.end_date.slice(0,10),
+        type: editLeave.type,
+        reason: editLeave.reason || "",
+      });
+      setEditOpen(false);
+      setEditLeave(null);
+      await refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Delete leave
+  async function doDeleteLeave() {
+    if (!confirmDelete) return;
+    try {
+      setLoading(true);
+      await deleteLeave(token, confirmDelete.id);
+      setConfirmDelete(null);
+      await refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
   /* --------------------------------- Render -------------------------------- */
 
   return (
@@ -437,18 +511,20 @@ export default function Dashboard() {
           >
             📊 <span>Dashboard</span>
           </Link>
-          <Link
-            to="/my-leaves"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700"
+
+          <button
+            onClick={() => setNotifOpen(true)}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700"
           >
-            🗂 <span>Leave Applications</span>
-          </Link>
-          <Link
-            to="/register"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700"
+            <Bell size={16} /> <span>Notifications</span>
+          </button>
+
+          <button
+            onClick={() => setRegisterOpen(true)}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700"
           >
-            ➕ <span>Register</span>
-          </Link>
+            <UserPlus2 size={16} /> <span>Register Employee</span>
+          </button>
         </nav>
       </aside>
 
@@ -471,11 +547,10 @@ export default function Dashboard() {
               <AButton
                 variant="ghost"
                 className="bg-white border border-gray-200"
-                onClick={() => setOverviewOpen(true)}
-                title="Open Calendar Overview"
+                onClick={() => setProfileOpen(true)}
               >
-                <CalendarIcon size={16} />
-                Strategic Dashboard
+                <UserCircle2 size={16} />
+                My Profile
               </AButton>
               <AButton
                 variant="ghost"
@@ -509,10 +584,7 @@ export default function Dashboard() {
           >
             <div className="space-y-2">
               <div className="h-2 rounded-full bg-blue-100" />
-              <div
-                className="h-2 rounded-full bg-emerald-200"
-                style={{ width: "85%" }}
-              />
+              <div className="h-2 rounded-full bg-emerald-200" style={{ width: "85%" }} />
             </div>
           </Section>
 
@@ -562,7 +634,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <label className="text-xs text-gray-500">
-                        End date (auto = start)
+                        End date {mode === "single" && "(auto = start)"}
                       </label>
                       <input
                         type="date"
@@ -610,11 +682,7 @@ export default function Dashboard() {
                       <Check size={16} />
                       Submit
                     </AButton>
-                    <AButton
-                      variant="ghost"
-                      onClick={refresh}
-                      loading={loading}
-                    >
+                    <AButton variant="ghost" onClick={refresh} loading={loading}>
                       Refresh
                     </AButton>
                   </div>
@@ -639,6 +707,26 @@ export default function Dashboard() {
                           {l.manager_comment ? ` · ${l.manager_comment}` : ""}
                         </div>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <AButton
+                          variant="ghost"
+                          onClick={() => {
+                            setEditLeave({
+                              ...l,
+                              reason: l.reason || "",
+                            });
+                            setEditOpen(true);
+                          }}
+                        >
+                          <PencilLine size={16} /> Edit
+                        </AButton>
+                        <AButton
+                          variant="danger"
+                          onClick={() => setConfirmDelete(l)}
+                        >
+                          <Trash2 size={16} /> Delete
+                        </AButton>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -655,7 +743,17 @@ export default function Dashboard() {
                   </AButton>
                 }
               >
-                <CalendarMini items={mine} />
+                <CalendarMini
+                  items={mine}
+                  onDateClick={(date) => {
+                    // open popover for that day using overview state
+                    setOverviewForDay(date);
+                    setOverviewOpen(true);
+                    // ensure month data is loaded if month changed
+                    const m0 = new Date(date.getFullYear(), date.getMonth(), 1);
+                    setOverviewMonth(m0);
+                  }}
+                />
               </Section>
 
               {user?.role === "ADMIN" && (
@@ -690,6 +788,24 @@ export default function Dashboard() {
                           >
                             <X size={16} /> Reject
                           </AButton>
+                          <AButton
+                            variant="ghost"
+                            onClick={() => {
+                              setEditLeave({
+                                ...l,
+                                reason: l.reason || "",
+                              });
+                              setEditOpen(true);
+                            }}
+                          >
+                            <PencilLine size={16} /> Edit
+                          </AButton>
+                          <AButton
+                            variant="danger"
+                            onClick={() => setConfirmDelete(l)}
+                          >
+                            <Trash2 size={16} /> Delete
+                          </AButton>
                         </div>
                       </div>
                     ))}
@@ -708,7 +824,7 @@ export default function Dashboard() {
           <div className="fixed inset-0 z-50 grid place-items-center pointer-events-none">
             <div className="flex items-center gap-3 text-slate-700">
               <Loader2 className="animate-spin" size={28} />
-              <span className="font-medium">Refreshing…</span>
+              <span className="font-medium">Working…</span>
             </div>
           </div>
         </>
@@ -725,20 +841,11 @@ export default function Dashboard() {
         setMonthDate={setOverviewMonth}
         rows={overviewRows}
         onDayClick={(date) => {
-          // show a simple inline list for the selected day:
           setOverviewForDay(date);
-          // You can fancy this up into another nested modal if you want.
-          const s = startOfMonth(date);
-          const e = endOfMonth(date);
-          console.debug(
-            "Selected day:",
-            date.toDateString(),
-            "Range of month:", s, e
-          );
         }}
       />
 
-      {/* Tiny popover-style panel for the selected day (if chosen) */}
+      {/* Day popover (bottom-right) */}
       {overviewOpen && overviewForDay && (
         <div className="fixed bottom-5 right-5 z-50 w-[380px] bg-white rounded-xl shadow-xl border border-gray-200">
           <div className="px-4 py-3 border-b flex items-center justify-between">
@@ -752,7 +859,7 @@ export default function Dashboard() {
               <X size={18} />
             </button>
           </div>
-          <div className="p-3 space-y-2 max-h-[280px] overflow-auto">
+          <div className="p-3 space-y-2 max-h-[300px] overflow-auto">
             {overviewRows
               .filter((r) =>
                 within(
@@ -776,7 +883,6 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
-            {/* empty state */}
             {overviewRows.filter((r) =>
               within(
                 overviewForDay,
@@ -789,6 +895,313 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Notifications modal */}
+      <ModalShell
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        title="Notifications"
+        icon={<Bell size={18} />}
+      >
+        <div className="space-y-3">
+          <div className="text-sm text-gray-600">No new notifications.</div>
+          {/* Example static items — wire up to your API */}
+          {/* <div className="text-sm">Siti requested leave…</div> */}
+        </div>
+      </ModalShell>
+
+      {/* Register Employee modal */}
+      <RegisterEmployeeModal
+        open={registerOpen}
+        onClose={() => setRegisterOpen(false)}
+        onSubmit={async (payload) => {
+          try {
+            setLoading(true);
+            await registerEmployee(token, payload);
+            setRegisterOpen(false);
+          } finally {
+            setLoading(false);
+          }
+        }}
+      />
+
+      {/* Profile modal */}
+      <ProfileModal
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        user={user}
+        onSaveProfile={async (payload) => {
+          try {
+            setLoading(true);
+            await updateProfile(token, payload);
+            setProfileOpen(false);
+          } finally {
+            setLoading(false);
+          }
+        }}
+        onChangePassword={async (payload) => {
+          try {
+            setLoading(true);
+            await changePassword(token, payload);
+            setProfileOpen(false);
+          } finally {
+            setLoading(false);
+          }
+        }}
+      />
+
+      {/* Edit Leave modal */}
+      <ModalShell
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Edit Leave"
+        icon={<PencilLine size={18} />}
+        footer={
+          <div className="flex justify-end gap-2">
+            <AButton variant="ghost" onClick={() => setEditOpen(false)}>
+              Cancel
+            </AButton>
+            <AButton onClick={saveEdit} loading={loading}>
+              Save
+            </AButton>
+          </div>
+        }
+      >
+        {editLeave && (
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-500">Start</label>
+                <input
+                  type="date"
+                  className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                  value={editLeave.start_date.slice(0,10)}
+                  onChange={(e) =>
+                    setEditLeave((v) => ({ ...v, start_date: e.target.value }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">End</label>
+                <input
+                  type="date"
+                  className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                  value={editLeave.end_date.slice(0,10)}
+                  onChange={(e) =>
+                    setEditLeave((v) => ({ ...v, end_date: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-500">Type</label>
+                <select
+                  className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                  value={editLeave.type}
+                  onChange={(e) =>
+                    setEditLeave((v) => ({ ...v, type: e.target.value }))
+                  }
+                >
+                  <option>ANNUAL</option>
+                  <option>SICK</option>
+                  <option>UNPAID</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Reason</label>
+                <input
+                  className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+                  value={editLeave.reason || ""}
+                  onChange={(e) =>
+                    setEditLeave((v) => ({ ...v, reason: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </ModalShell>
+
+      {/* Delete confirm */}
+      <ModalShell
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        title="Delete Leave?"
+        icon={<Trash2 size={18} />}
+        footer={
+          <div className="flex justify-end gap-2">
+            <AButton variant="ghost" onClick={() => setConfirmDelete(null)}>
+              Cancel
+            </AButton>
+            <AButton variant="danger" onClick={doDeleteLeave} loading={loading}>
+              Delete
+            </AButton>
+          </div>
+        }
+      >
+        <div className="text-sm text-gray-600">
+          Are you sure you want to delete leave{" "}
+          <b>#{confirmDelete?.id}</b> ({confirmDelete?.start_date} →{" "}
+          {confirmDelete?.end_date})?
+        </div>
+      </ModalShell>
     </div>
+  );
+}
+
+/* ------------ Register / Profile modals (simple examples) --------------- */
+
+function RegisterEmployeeModal({ open, onClose, onSubmit }) {
+  const [p, setP] = useState({
+    name: "",
+    email: "",
+    role: "EMPLOYEE",
+    password: "",
+  });
+  return (
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      title="Register Employee"
+      icon={<UserPlus2 size={18} />}
+      footer={
+        <div className="flex justify-end gap-2">
+          <AButton variant="ghost" onClick={onClose}>Cancel</AButton>
+          <AButton onClick={() => onSubmit(p)}>Create</AButton>
+        </div>
+      }
+    >
+      <div className="grid gap-3">
+        <div>
+          <label className="text-xs text-gray-500">Name</label>
+          <input
+            className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+            value={p.name}
+            onChange={(e) => setP((v) => ({ ...v, name: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500">Email</label>
+          <input
+            className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+            value={p.email}
+            onChange={(e) => setP((v) => ({ ...v, email: e.target.value }))}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500">Role</label>
+            <select
+              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              value={p.role}
+              onChange={(e) => setP((v) => ({ ...v, role: e.target.value }))}
+            >
+              <option>EMPLOYEE</option>
+              <option>ADMIN</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Temp Password</label>
+            <input
+              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              value={p.password}
+              onChange={(e) => setP((v) => ({ ...v, password: e.target.value }))}
+              type="password"
+            />
+          </div>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function ProfileModal({ open, onClose, user, onSaveProfile, onChangePassword }) {
+  const [photo, setPhoto] = useState(null); // base64 preview
+  const [info, setInfo] = useState({ name: user?.name || "", email: user?.email || "" });
+  const [pass, setPass] = useState({ current: "", new: "" });
+
+  useEffect(() => {
+    setInfo({ name: user?.name || "", email: user?.email || "" });
+  }, [user]);
+
+  function onPick(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => setPhoto(reader.result);
+    reader.readAsDataURL(f);
+  }
+
+  return (
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      title="My Profile"
+      icon={<UserCircle2 size={18} />}
+    >
+      <div className="grid gap-6">
+        <div className="flex items-center gap-4">
+          <img
+            src={photo || "https://i.pravatar.cc/80"}
+            alt="avatar"
+            className="w-16 h-16 rounded-full border"
+          />
+          <div>
+            <input type="file" accept="image/*" onChange={onPick} />
+            <div className="text-xs text-gray-500">Change profile photo</div>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500">Name</label>
+            <input
+              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              value={info.name}
+              onChange={(e) => setInfo((v) => ({ ...v, name: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">Email</label>
+            <input
+              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              value={info.email}
+              onChange={(e) => setInfo((v) => ({ ...v, email: e.target.value }))}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <AButton onClick={() => onSaveProfile({ ...info, photo })}>Save Profile</AButton>
+        </div>
+
+        <hr className="border-gray-200" />
+
+        <div className="grid md:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500">Current Password</label>
+            <input
+              type="password"
+              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              value={pass.current}
+              onChange={(e) => setPass((v) => ({ ...v, current: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500">New Password</label>
+            <input
+              type="password"
+              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
+              value={pass.new}
+              onChange={(e) => setPass((v) => ({ ...v, new: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <AButton onClick={() => onChangePassword(pass)}>Change Password</AButton>
+        </div>
+      </div>
+    </ModalShell>
   );
 }

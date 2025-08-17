@@ -19,6 +19,56 @@ export function login(email, password) {
   });
 }
 
+export async function updateLeave(token, id, payload) {
+  const r = await fetch(`${API_BASE}/api/leaves/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error('Update failed');
+  return r.json();
+}
+
+export async function deleteLeave(token, id) {
+  const r = await fetch(`${API_BASE}/api/leaves/${id}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error('Delete failed');
+  return r.json();
+}
+
+export async function updateProfile(token, payload) {
+  const r = await fetch(`${API_BASE}/api/me/profile`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error('Update profile failed');
+  return r.json();
+}
+
+export async function changePassword(token, payload) {
+  const r = await fetch(`${API_BASE}/api/me/password`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error('Change password failed');
+  return r.json();
+}
+
+export async function registerEmployee(token, payload) {
+  const r = await fetch(`${API_BASE}/api/admin/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error('Register employee failed');
+  return r.json();
+}
+
+
 export function registerUser(token, payload) {
   return j(`${API}/api/auth/register`, {
     method:'POST',
