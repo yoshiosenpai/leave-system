@@ -9,11 +9,22 @@ const adminRoutes = require('./routes/admin');
 
 const app = express();
 
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+  : '*';
+
+const corsOptions = {
+  origin: allowedOrigins,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  credentials: false,
+  optionsSuccessStatus: 204, // for legacy browsers
+};
+
 app.use(express.json());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*',
-  credentials: false
-}));
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // <— important for preflight
+
 app.use(morgan('dev'));
 
 app.get('/', (_req, res) => res.json({ ok: true, service: 'leave-application-system' }));
