@@ -6,19 +6,7 @@
 #  Leave Management System  
 
 A modern **Leave Management System** built with **React + Vite** (frontend) and **Node.js + PostgreSQL** (backend).  
-It allows employees to apply for leave, managers to review, and HR/admins to track leave records seamlessly.  
-
-Dashboard Preview:
-
-![Dashboard Preview](./frontend/src/assets/Dashboard.png) 
-
-Login Screen Preview:
-
-![Login Screen Preview](./frontend/src/assets/login-screen.png)
-
-Calendar Preview:
-
-![Calendar Preview](./frontend/src/assets/Calendar-overview.png)
+It allows employees to apply for leave, managers to review, and HR/admins to track leave records seamlessly.
 
 ---
 
