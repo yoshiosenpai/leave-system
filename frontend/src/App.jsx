@@ -2,6 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { allLeaves, approve, createLeave, metrics, myLeaves, reject } from "./api";
 import { useAuth } from "./auth";
 import { CalendarIcon, Check, LogOut, RefreshCcw, UserPlus, X } from "lucide-react";
+import Dashboard from "./pages/Dashboard";
+
+
+<Routes>
+  <Route path="/" element={<Login />} />
+  <Route path="/dashboard" element={<Dashboard />} />
+</Routes>
 
 function Navbar(){
   const { user, logout } = useAuth();

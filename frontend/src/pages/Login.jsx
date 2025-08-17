@@ -55,7 +55,7 @@ export default function Login() {
     try {
       const r = await login(form.email, form.password);
       doLogin(r.token, r.user);
-      navigate("/"); // or "/dashboard" if that’s your home route
+      navigate("/dashboard"); // or "/dashboard" if that’s your home route
     } catch (err) {
       alert("Login failed: " + (err?.message || "Unknown error"));
       setLoading(false);
