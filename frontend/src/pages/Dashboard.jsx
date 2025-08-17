@@ -1,5 +1,5 @@
 // src/pages/Dashboard.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   allLeaves,
@@ -8,7 +8,6 @@ import {
   metrics,
   myLeaves,
   reject,
-  // NEW:
   updateLeave,
   deleteLeave,
   registerEmployee,
@@ -32,11 +31,14 @@ import {
   Bell,
   UserPlus2,
   UserCircle2,
+  CheckCircle2,
+  AlertCircle,
+  Upload,
 } from "lucide-react";
 
 /* --------------------------------- Helpers -------------------------------- */
-// tiny classnames
 const cls = (...p) => p.filter(Boolean).join(" ");
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function formatISO(d) {
   return new Date(d).toISOString().slice(0, 10);
@@ -109,6 +111,34 @@ function Section({ title, right, children }) {
   );
 }
 
+/* ------------------------------- Toast mini ------------------------------- */
+
+function Toast({ kind = "success", text, onClose }) {
+  if (!text) return null;
+  const isBad = kind === "error";
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60]">
+      <div
+        className={cls(
+          "flex items-center gap-2 px-4 py-2 rounded-lg shadow-md border",
+          isBad
+            ? "bg-rose-50 text-rose-700 border-rose-200"
+            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+        )}
+      >
+        {isBad ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+        <span className="text-sm">{text}</span>
+        <button
+          className="ml-2 text-xs opacity-70 hover:opacity-100"
+          onClick={onClose}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ----------------------------- Calendar (mini) ----------------------------- */
 
 function CalendarMini({ items = [], onDateClick }) {
@@ -116,7 +146,7 @@ function CalendarMini({ items = [], onDateClick }) {
   const y = d.getFullYear();
   const m = d.getMonth();
   const today = d.getDate();
-  const first = new Date(y, m, 1).getDay(); // 0 = Sun
+  const first = new Date(y, m, 1).getDay();
   const days = new Date(y, m + 1, 0).getDate();
 
   const cells = Array.from({ length: first }, () => null).concat(
@@ -128,8 +158,7 @@ function CalendarMini({ items = [], onDateClick }) {
     const s = new Date(l.start_date);
     const e = new Date(l.end_date);
     for (let dt = new Date(s); dt <= e; dt.setDate(dt.getDate() + 1)) {
-      if (dt.getMonth() === m && dt.getFullYear() === y)
-        marked.add(dt.getDate());
+      if (dt.getMonth() === m && dt.getFullYear() === y) marked.add(dt.getDate());
     }
   });
 
@@ -140,10 +169,7 @@ function CalendarMini({ items = [], onDateClick }) {
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-semibold">Calendar</h3>
         <span className="text-xs text-gray-500">
-          {new Date(y, m, 1).toLocaleString(undefined, {
-            month: "long",
-            year: "numeric",
-          })}
+          {new Date(y, m, 1).toLocaleString(undefined, { month: "long", year: "numeric" })}
         </span>
       </div>
       <div className="grid grid-cols-7 gap-2 text-center text-xs text-gray-500">
@@ -155,23 +181,24 @@ function CalendarMini({ items = [], onDateClick }) {
         {cells.map((v, i) => {
           const clickable = v !== null;
           const date = clickable ? new Date(y, m, v) : null;
-        return (
-          <button
-            key={i}
-            disabled={!clickable}
-            onClick={() => clickable && onDateClick?.(date)}
-            className={cls(
-              "h-10 rounded-lg flex items-center justify-center border text-sm",
-              !clickable
-                ? "border-transparent cursor-default"
-                : "bg-white hover:bg-sky-50 border-gray-200",
-              v === today && "ring-2 ring-sky-300",
-              v && marked.has(v) && "bg-sky-50 border-sky-200"
-            )}
-          >
-            {v ?? ""}
-          </button>
-        )})}
+          return (
+            <button
+              key={i}
+              disabled={!clickable}
+              onClick={() => clickable && onDateClick?.(date)}
+              className={cls(
+                "h-10 rounded-lg flex items-center justify-center border text-sm transition-colors",
+                !clickable
+                  ? "border-transparent cursor-default"
+                  : "bg-white hover:bg-sky-50 border-gray-200",
+                v === today && "ring-2 ring-sky-300",
+                v && marked.has(v) && "bg-sky-50 border-sky-200"
+              )}
+            >
+              {v ?? ""}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -200,10 +227,7 @@ function CalendarOverviewModal({
 
   return (
     <div className="fixed inset-0 z-50">
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="absolute inset-0 grid place-items-center p-4">
         <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b">
@@ -222,10 +246,7 @@ function CalendarOverviewModal({
                 <ChevronLeft size={18} />
               </AButton>
               <div className="text-sm text-gray-600 min-w-[120px] text-center">
-                {monthDate.toLocaleString(undefined, {
-                  month: "long",
-                  year: "numeric",
-                })}
+                {monthDate.toLocaleString(undefined, { month: "long", year: "numeric" })}
               </div>
               <AButton
                 variant="ghost"
@@ -251,15 +272,11 @@ function CalendarOverviewModal({
             <div className="mt-2 grid grid-cols-7 gap-2">
               {cells.map((v, i) => {
                 const date = v ? new Date(y, m, v) : null;
-                const count = v
-                  ? rows.filter((r) =>
-                      within(
-                        date,
-                        new Date(r.start_date),
-                        new Date(r.end_date)
-                      )
-                    ).length
-                  : 0;
+                const count =
+                  v &&
+                  rows.filter((r) =>
+                    within(date, new Date(r.start_date), new Date(r.end_date))
+                  ).length;
                 return (
                   <button
                     key={i}
@@ -280,7 +297,6 @@ function CalendarOverviewModal({
                 );
               })}
             </div>
-
             <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded bg-sky-100 border border-sky-200" />
@@ -294,7 +310,7 @@ function CalendarOverviewModal({
   );
 }
 
-/* ----------------------------- Small popups ----------------------------- */
+/* ----------------------------- Small modals ----------------------------- */
 
 function ModalShell({ open, title, icon, onClose, children, footer }) {
   if (!open) return null;
@@ -330,6 +346,9 @@ export default function Dashboard() {
   const [stat, setStat] = useState({});
   const [loading, setLoading] = useState(false);
 
+  // global toast
+  const [toast, setToast] = useState({ kind: "success", text: "" });
+
   const todayStr = formatISO(new Date());
   const [mode, setMode] = useState("single");
   const [form, setForm] = useState({
@@ -339,21 +358,24 @@ export default function Dashboard() {
     reason: "",
   });
 
-  // Calendar overview modal state
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [overviewMonth, setOverviewMonth] = useState(startOfMonth(new Date()));
   const [overviewRows, setOverviewRows] = useState([]);
-  const [overviewForDay, setOverviewForDay] = useState(null); // selected date
+  const [overviewForDay, setOverviewForDay] = useState(null);
 
-  // Popups: Notifications, Register Employee, Profile
+  // popups
   const [notifOpen, setNotifOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // Edit/Delete state
+  // edit/delete
   const [editOpen, setEditOpen] = useState(false);
   const [editLeave, setEditLeave] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // profile saving flags
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [changingPass, setChangingPass] = useState(false);
 
   const kpis = useMemo(
     () => [
@@ -373,10 +395,8 @@ export default function Dashboard() {
       setLoading(true);
       const [my, pend, met] = await Promise.all([
         myLeaves(token),
-        user?.role === "ADMIN"
-          ? allLeaves(token, { status: "PENDING" })
-          : Promise.resolve([]),
-        user?.role === "ADMIN" ? metrics(token) : Promise.resolve({}),
+        user?.role === "ADMIN" ? allLeaves(token, { status: "PENDING" }) : [],
+        user?.role === "ADMIN" ? metrics(token) : {},
       ]);
       setMine(my || []);
       setPending(pend || []);
@@ -386,18 +406,15 @@ export default function Dashboard() {
     }
   }
 
-  // Initial load
   useEffect(() => {
     if (token) refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // Load overview data for a month (with fallback filter)
   async function loadOverviewForMonth(d) {
     const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const s = startOfMonth(d);
     const e = endOfMonth(d);
-
     try {
       setLoading(true);
       let rows = await allLeaves(token, { month: ym });
@@ -408,15 +425,11 @@ export default function Dashboard() {
         );
       }
       setOverviewRows(rows || []);
-    } catch (e) {
-      console.error(e);
-      setOverviewRows([]);
     } finally {
       setLoading(false);
     }
   }
 
-  // When month changes in modal
   useEffect(() => {
     if (overviewOpen) loadOverviewForMonth(overviewMonth);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -432,8 +445,9 @@ export default function Dashboard() {
       if (r?.id) {
         setForm((f) => ({ ...f, reason: "" }));
         await refresh();
+        setToast({ kind: "success", text: "Leave submitted." });
       } else {
-        alert("Failed to create leave.");
+        setToast({ kind: "error", text: "Failed to create leave." });
       }
     } finally {
       setLoading(false);
@@ -446,37 +460,54 @@ export default function Dashboard() {
       if (type === "approve") await approve(token, id, "Approved");
       else await reject(token, id, "Rejected");
       await refresh();
+      setToast({ kind: "success", text: "Decision saved." });
     } finally {
       setLoading(false);
     }
   }
 
-  // Save edit
   async function saveEdit() {
     if (!editLeave) return;
+    // optimistic update (both mine & pending if exists)
+    setMine((prev) =>
+      prev.map((l) => (l.id === editLeave.id ? { ...l, ...editLeave } : l))
+    );
+    setPending((prev) =>
+      prev.map((l) => (l.id === editLeave.id ? { ...l, ...editLeave } : l))
+    );
+    setEditOpen(false);
     try {
       setLoading(true);
       await updateLeave(token, editLeave.id, {
-        startDate: editLeave.start_date.slice(0,10),
-        endDate: editLeave.end_date.slice(0,10),
+        startDate: editLeave.start_date.slice(0, 10),
+        endDate: editLeave.end_date.slice(0, 10),
         type: editLeave.type,
         reason: editLeave.reason || "",
       });
-      setEditOpen(false);
-      setEditLeave(null);
+      setToast({ kind: "success", text: "Leave updated." });
       await refresh();
+    } catch {
+      setToast({ kind: "error", text: "Update failed (reverted)." });
+      await refresh(); // revert from server truth
     } finally {
       setLoading(false);
     }
   }
 
-  // Delete leave
   async function doDeleteLeave() {
     if (!confirmDelete) return;
+    // optimistic remove
+    const id = confirmDelete.id;
+    setConfirmDelete(null);
+    setMine((prev) => prev.filter((l) => l.id !== id));
+    setPending((prev) => prev.filter((l) => l.id !== id));
     try {
       setLoading(true);
-      await deleteLeave(token, confirmDelete.id);
-      setConfirmDelete(null);
+      await deleteLeave(token, id);
+      setToast({ kind: "success", text: "Leave deleted." });
+      await refresh();
+    } catch {
+      setToast({ kind: "error", text: "Delete failed (reverted)." });
       await refresh();
     } finally {
       setLoading(false);
@@ -507,23 +538,28 @@ export default function Dashboard() {
         <nav className="mt-3 px-2 space-y-1">
           <Link
             to="/"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700 transition-all"
           >
             📊 <span>Dashboard</span>
           </Link>
 
+          {/* Animated hover: slight slide + color */}
           <button
             onClick={() => setNotifOpen(true)}
-            className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700"
+            className="group w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-slate-700
+                       transition-all duration-200 hover:bg-sky-50 hover:translate-x-[2px] active:scale-[.99]"
           >
-            <Bell size={16} /> <span>Notifications</span>
+            <Bell size={16} className="transition-transform group-hover:scale-110" />
+            <span>Notifications</span>
           </button>
 
           <button
             onClick={() => setRegisterOpen(true)}
-            className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700"
+            className="group w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-slate-700
+                       transition-all duration-200 hover:bg-sky-50 hover:translate-x-[2px] active:scale-[.99]"
           >
-            <UserPlus2 size={16} /> <span>Register Employee</span>
+            <UserPlus2 size={16} className="transition-transform group-hover:scale-110" />
+            <span>Register Employee</span>
           </button>
         </nav>
       </aside>
@@ -536,10 +572,7 @@ export default function Dashboard() {
             <div className="flex-1 max-w-md">
               <div className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg">
                 <Search size={16} className="text-gray-400" />
-                <input
-                  className="w-full outline-none text-sm bg-transparent"
-                  placeholder="Search…"
-                />
+                <input className="w-full outline-none text-sm bg-transparent" placeholder="Search…" />
               </div>
             </div>
 
@@ -552,11 +585,7 @@ export default function Dashboard() {
                 <UserCircle2 size={16} />
                 My Profile
               </AButton>
-              <AButton
-                variant="ghost"
-                className="bg-white border border-gray-200"
-                onClick={logout}
-              >
+              <AButton variant="ghost" className="bg-white border border-gray-200" onClick={logout}>
                 <LogoutIcon size={16} />
                 Logout
               </AButton>
@@ -566,7 +595,7 @@ export default function Dashboard() {
 
         {/* Content */}
         <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-          {/* Plan Timeline (TOP) */}
+          {/* Plan Timeline */}
           <Section
             title="Plan Timeline"
             right={
@@ -597,22 +626,16 @@ export default function Dashboard() {
 
           {/* Apply Leave + Calendar */}
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Apply Leave form (span 2) */}
+            {/* form (span 2) */}
             <div className="lg:col-span-2 space-y-6">
               <Section
                 title="Apply Leave"
                 right={
                   <div className="flex gap-2">
-                    <AButton
-                      variant={mode === "single" ? "primary" : "ghost"}
-                      onClick={() => setMode("single")}
-                    >
+                    <AButton variant={mode === "single" ? "primary" : "ghost"} onClick={() => setMode("single")}>
                       Single Day
                     </AButton>
-                    <AButton
-                      variant={mode === "range" ? "primary" : "ghost"}
-                      onClick={() => setMode("range")}
-                    >
+                    <AButton variant={mode === "range" ? "primary" : "ghost"} onClick={() => setMode("range")}>
                       Range
                     </AButton>
                   </div>
@@ -625,9 +648,7 @@ export default function Dashboard() {
                       <input
                         type="date"
                         value={form.startDate}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, startDate: e.target.value }))
-                        }
+                        onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
                         className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
                         required
                       />
@@ -639,9 +660,7 @@ export default function Dashboard() {
                       <input
                         type="date"
                         value={form.endDate}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, endDate: e.target.value }))
-                        }
+                        onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
                         className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 disabled:opacity-70"
                         required
                         disabled={mode === "single"}
@@ -654,9 +673,7 @@ export default function Dashboard() {
                       <label className="text-xs text-gray-500">Type</label>
                       <select
                         value={form.type}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, type: e.target.value }))
-                        }
+                        onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
                         className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
                       >
                         <option>ANNUAL</option>
@@ -668,9 +685,7 @@ export default function Dashboard() {
                       <label className="text-xs text-gray-500">Reason</label>
                       <input
                         value={form.reason}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, reason: e.target.value }))
-                        }
+                        onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
                         placeholder="Optional"
                         className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
                       />
@@ -692,9 +707,7 @@ export default function Dashboard() {
               {/* My Leaves */}
               <Section title="My Leaves">
                 <div className="space-y-3">
-                  {mine.length === 0 && (
-                    <div className="text-sm text-gray-500">No leaves yet.</div>
-                  )}
+                  {mine.length === 0 && <div className="text-sm text-gray-500">No leaves yet.</div>}
                   {mine.map((l) => (
                     <div
                       key={l.id}
@@ -711,19 +724,13 @@ export default function Dashboard() {
                         <AButton
                           variant="ghost"
                           onClick={() => {
-                            setEditLeave({
-                              ...l,
-                              reason: l.reason || "",
-                            });
+                            setEditLeave({ ...l, reason: l.reason || "" });
                             setEditOpen(true);
                           }}
                         >
                           <PencilLine size={16} /> Edit
                         </AButton>
-                        <AButton
-                          variant="danger"
-                          onClick={() => setConfirmDelete(l)}
-                        >
+                        <AButton variant="danger" onClick={() => setConfirmDelete(l)}>
                           <Trash2 size={16} /> Delete
                         </AButton>
                       </div>
@@ -733,7 +740,7 @@ export default function Dashboard() {
               </Section>
             </div>
 
-            {/* Right column: Calendar + Pending approvals */}
+            {/* Right column */}
             <div className="space-y-6">
               <Section
                 title="Calendar"
@@ -746,12 +753,9 @@ export default function Dashboard() {
                 <CalendarMini
                   items={mine}
                   onDateClick={(date) => {
-                    // open popover for that day using overview state
                     setOverviewForDay(date);
                     setOverviewOpen(true);
-                    // ensure month data is loaded if month changed
-                    const m0 = new Date(date.getFullYear(), date.getMonth(), 1);
-                    setOverviewMonth(m0);
+                    setOverviewMonth(new Date(date.getFullYear(), date.getMonth(), 1));
                   }}
                 />
               </Section>
@@ -759,11 +763,7 @@ export default function Dashboard() {
               {user?.role === "ADMIN" && (
                 <Section
                   title="Pending Approvals"
-                  right={
-                    <span className="text-xs text-gray-500">
-                      {pending.length} pending
-                    </span>
-                  }
+                  right={<span className="text-xs text-gray-500">{pending.length} pending</span>}
                 >
                   <div className="space-y-3">
                     {pending.length === 0 && (
@@ -775,35 +775,25 @@ export default function Dashboard() {
                         className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center justify-between"
                       >
                         <div className="text-sm">
-                          <b>#{l.id}</b> {l.employee_name} · {l.type} ·{" "}
-                          {l.start_date} → {l.end_date}
+                          <b>#{l.id}</b> {l.employee_name} · {l.type} · {l.start_date} → {l.end_date}
                         </div>
                         <div className="flex items-center gap-2">
                           <AButton onClick={() => act(l.id, "approve")}>
                             <Check size={16} /> Approve
                           </AButton>
-                          <AButton
-                            variant="danger"
-                            onClick={() => act(l.id, "reject")}
-                          >
+                          <AButton variant="danger" onClick={() => act(l.id, "reject")}>
                             <X size={16} /> Reject
                           </AButton>
                           <AButton
                             variant="ghost"
                             onClick={() => {
-                              setEditLeave({
-                                ...l,
-                                reason: l.reason || "",
-                              });
+                              setEditLeave({ ...l, reason: l.reason || "" });
                               setEditOpen(true);
                             }}
                           >
                             <PencilLine size={16} /> Edit
                           </AButton>
-                          <AButton
-                            variant="danger"
-                            onClick={() => setConfirmDelete(l)}
-                          >
+                          <AButton variant="danger" onClick={() => setConfirmDelete(l)}>
                             <Trash2 size={16} /> Delete
                           </AButton>
                         </div>
@@ -817,7 +807,7 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* Full-page loading overlay (covers topbar/side) */}
+      {/* Full overlay */}
       {loading && (
         <>
           <div className="fixed inset-0 z-40 bg-white/40 backdrop-blur-sm" />
@@ -840,33 +830,22 @@ export default function Dashboard() {
         monthDate={overviewMonth}
         setMonthDate={setOverviewMonth}
         rows={overviewRows}
-        onDayClick={(date) => {
-          setOverviewForDay(date);
-        }}
+        onDayClick={(date) => setOverviewForDay(date)}
       />
 
-      {/* Day popover (bottom-right) */}
+      {/* Day popover */}
       {overviewOpen && overviewForDay && (
         <div className="fixed bottom-5 right-5 z-50 w-[380px] bg-white rounded-xl shadow-xl border border-gray-200">
           <div className="px-4 py-3 border-b flex items-center justify-between">
-            <div className="text-sm font-semibold">
-              {overviewForDay.toLocaleDateString()}
-            </div>
-            <button
-              className="text-gray-400 hover:text-gray-600"
-              onClick={() => setOverviewForDay(null)}
-            >
+            <div className="text-sm font-semibold">{overviewForDay.toLocaleDateString()}</div>
+            <button className="text-gray-400 hover:text-gray-600" onClick={() => setOverviewForDay(null)}>
               <X size={18} />
             </button>
           </div>
           <div className="p-3 space-y-2 max-h-[300px] overflow-auto">
             {overviewRows
               .filter((r) =>
-                within(
-                  overviewForDay,
-                  new Date(r.start_date),
-                  new Date(r.end_date)
-                )
+                within(overviewForDay, new Date(r.start_date), new Date(r.end_date))
               )
               .map((r) => (
                 <div
@@ -884,29 +863,16 @@ export default function Dashboard() {
                 </div>
               ))}
             {overviewRows.filter((r) =>
-              within(
-                overviewForDay,
-                new Date(r.start_date),
-                new Date(r.end_date)
-              )
-            ).length === 0 && (
-              <div className="text-xs text-gray-500">No one on leave.</div>
-            )}
+              within(overviewForDay, new Date(r.start_date), new Date(r.end_date))
+            ).length === 0 && <div className="text-xs text-gray-500">No one on leave.</div>}
           </div>
         </div>
       )}
 
       {/* Notifications modal */}
-      <ModalShell
-        open={notifOpen}
-        onClose={() => setNotifOpen(false)}
-        title="Notifications"
-        icon={<Bell size={18} />}
-      >
+      <ModalShell open={notifOpen} onClose={() => setNotifOpen(false)} title="Notifications" icon={<Bell size={18} />}>
         <div className="space-y-3">
           <div className="text-sm text-gray-600">No new notifications.</div>
-          {/* Example static items — wire up to your API */}
-          {/* <div className="text-sm">Siti requested leave…</div> */}
         </div>
       </ModalShell>
 
@@ -915,12 +881,15 @@ export default function Dashboard() {
         open={registerOpen}
         onClose={() => setRegisterOpen(false)}
         onSubmit={async (payload) => {
+          setSavingProfile(true);
           try {
-            setLoading(true);
             await registerEmployee(token, payload);
+            setToast({ kind: "success", text: "Employee registered." });
             setRegisterOpen(false);
+          } catch {
+            setToast({ kind: "error", text: "Register failed." });
           } finally {
-            setLoading(false);
+            setSavingProfile(false);
           }
         }}
       />
@@ -930,22 +899,28 @@ export default function Dashboard() {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         user={user}
+        savingProfile={savingProfile}
+        changingPass={changingPass}
         onSaveProfile={async (payload) => {
+          setSavingProfile(true);
           try {
-            setLoading(true);
             await updateProfile(token, payload);
-            setProfileOpen(false);
+            setToast({ kind: "success", text: "Profile saved." });
+          } catch {
+            setToast({ kind: "error", text: "Save failed." });
           } finally {
-            setLoading(false);
+            setSavingProfile(false);
           }
         }}
         onChangePassword={async (payload) => {
+          setChangingPass(true);
           try {
-            setLoading(true);
-            await changePassword(token, payload);
-            setProfileOpen(false);
+            await changePassword(token, payload); // should 4xx on bad current password
+            setToast({ kind: "success", text: "Password changed." });
+          } catch (e) {
+            setToast({ kind: "error", text: "Current password is incorrect." });
           } finally {
-            setLoading(false);
+            setChangingPass(false);
           }
         }}
       />
@@ -975,10 +950,8 @@ export default function Dashboard() {
                 <input
                   type="date"
                   className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
-                  value={editLeave.start_date.slice(0,10)}
-                  onChange={(e) =>
-                    setEditLeave((v) => ({ ...v, start_date: e.target.value }))
-                  }
+                  value={editLeave.start_date.slice(0, 10)}
+                  onChange={(e) => setEditLeave((v) => ({ ...v, start_date: e.target.value }))}
                 />
               </div>
               <div>
@@ -986,10 +959,8 @@ export default function Dashboard() {
                 <input
                   type="date"
                   className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
-                  value={editLeave.end_date.slice(0,10)}
-                  onChange={(e) =>
-                    setEditLeave((v) => ({ ...v, end_date: e.target.value }))
-                  }
+                  value={editLeave.end_date.slice(0, 10)}
+                  onChange={(e) => setEditLeave((v) => ({ ...v, end_date: e.target.value }))}
                 />
               </div>
             </div>
@@ -999,9 +970,7 @@ export default function Dashboard() {
                 <select
                   className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
                   value={editLeave.type}
-                  onChange={(e) =>
-                    setEditLeave((v) => ({ ...v, type: e.target.value }))
-                  }
+                  onChange={(e) => setEditLeave((v) => ({ ...v, type: e.target.value }))}
                 >
                   <option>ANNUAL</option>
                   <option>SICK</option>
@@ -1013,9 +982,7 @@ export default function Dashboard() {
                 <input
                   className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white"
                   value={editLeave.reason || ""}
-                  onChange={(e) =>
-                    setEditLeave((v) => ({ ...v, reason: e.target.value }))
-                  }
+                  onChange={(e) => setEditLeave((v) => ({ ...v, reason: e.target.value }))}
                 />
               </div>
             </div>
@@ -1041,24 +1008,24 @@ export default function Dashboard() {
         }
       >
         <div className="text-sm text-gray-600">
-          Are you sure you want to delete leave{" "}
-          <b>#{confirmDelete?.id}</b> ({confirmDelete?.start_date} →{" "}
+          Are you sure you want to delete leave <b>#{confirmDelete?.id}</b> ({confirmDelete?.start_date} →{" "}
           {confirmDelete?.end_date})?
         </div>
       </ModalShell>
+
+      <Toast
+        kind={toast.kind}
+        text={toast.text}
+        onClose={() => setToast({ kind: "success", text: "" })}
+      />
     </div>
   );
 }
 
-/* ------------ Register / Profile modals (simple examples) --------------- */
+/* ------------ Register / Profile modals --------------- */
 
 function RegisterEmployeeModal({ open, onClose, onSubmit }) {
-  const [p, setP] = useState({
-    name: "",
-    email: "",
-    role: "EMPLOYEE",
-    password: "",
-  });
+  const [p, setP] = useState({ name: "", email: "", role: "EMPLOYEE", password: "" });
   return (
     <ModalShell
       open={open}
@@ -1067,7 +1034,9 @@ function RegisterEmployeeModal({ open, onClose, onSubmit }) {
       icon={<UserPlus2 size={18} />}
       footer={
         <div className="flex justify-end gap-2">
-          <AButton variant="ghost" onClick={onClose}>Cancel</AButton>
+          <AButton variant="ghost" onClick={onClose}>
+            Cancel
+          </AButton>
           <AButton onClick={() => onSubmit(p)}>Create</AButton>
         </div>
       }
@@ -1116,10 +1085,19 @@ function RegisterEmployeeModal({ open, onClose, onSubmit }) {
   );
 }
 
-function ProfileModal({ open, onClose, user, onSaveProfile, onChangePassword }) {
-  const [photo, setPhoto] = useState(null); // base64 preview
+function ProfileModal({
+  open,
+  onClose,
+  user,
+  onSaveProfile,
+  onChangePassword,
+  savingProfile,
+  changingPass,
+}) {
+  const [photo, setPhoto] = useState(null);
   const [info, setInfo] = useState({ name: user?.name || "", email: user?.email || "" });
   const [pass, setPass] = useState({ current: "", new: "" });
+  const fileRef = useRef(null);
 
   useEffect(() => {
     setInfo({ name: user?.name || "", email: user?.email || "" });
@@ -1134,12 +1112,7 @@ function ProfileModal({ open, onClose, user, onSaveProfile, onChangePassword }) 
   }
 
   return (
-    <ModalShell
-      open={open}
-      onClose={onClose}
-      title="My Profile"
-      icon={<UserCircle2 size={18} />}
-    >
+    <ModalShell open={open} onClose={onClose} title="My Profile" icon={<UserCircle2 size={18} />}>
       <div className="grid gap-6">
         <div className="flex items-center gap-4">
           <img
@@ -1147,9 +1120,17 @@ function ProfileModal({ open, onClose, user, onSaveProfile, onChangePassword }) 
             alt="avatar"
             className="w-16 h-16 rounded-full border"
           />
-          <div>
-            <input type="file" accept="image/*" onChange={onPick} />
-            <div className="text-xs text-gray-500">Change profile photo</div>
+          <div className="flex items-center gap-3">
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
+            <AButton
+              variant="ghost"
+              className="border bg-white"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload size={16} />
+              Upload photo
+            </AButton>
+            <span className="text-xs text-gray-500">PNG/JPG up to ~1MB</span>
           </div>
         </div>
 
@@ -1173,7 +1154,9 @@ function ProfileModal({ open, onClose, user, onSaveProfile, onChangePassword }) 
         </div>
 
         <div className="flex justify-end">
-          <AButton onClick={() => onSaveProfile({ ...info, photo })}>Save Profile</AButton>
+          <AButton onClick={() => onSaveProfile({ ...info, photo })} loading={savingProfile}>
+            Save Profile
+          </AButton>
         </div>
 
         <hr className="border-gray-200" />
@@ -1199,7 +1182,9 @@ function ProfileModal({ open, onClose, user, onSaveProfile, onChangePassword }) 
           </div>
         </div>
         <div className="flex justify-end">
-          <AButton onClick={() => onChangePassword(pass)}>Change Password</AButton>
+          <AButton onClick={() => onChangePassword(pass)} loading={changingPass}>
+            Change Password
+          </AButton>
         </div>
       </div>
     </ModalShell>
