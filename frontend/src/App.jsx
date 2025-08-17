@@ -3,7 +3,8 @@ import { allLeaves, approve, createLeave, metrics, myLeaves, reject } from "./ap
 import { useAuth } from "./auth";
 import { CalendarIcon, Check, LogOut, RefreshCcw, UserPlus, X } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
-
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Login from "./pages/Login";
 
 <Routes>
   <Route path="/" element={<Login />} />
@@ -119,11 +120,15 @@ export default function App(){
   ], [mine, stat, user]);
 
   return (
-    <>
-      <Navbar/>
-      <div className="container">
-        <div className="row grid-3">
-          {kpis.map((k,i)=>(
+    <Router>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </Router>
+  );
+}
+
             <div className="card" key={i}>
               <h3>{k.label}</h3>
               <div className="kpi">{k.value}</div>
