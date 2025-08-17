@@ -32,7 +32,7 @@ function AButton({ variant = "primary", className = "", children, ...rest }) {
     "focus:outline-none focus:ring-2 focus:ring-blue-400 hover:scale-[1.02] active:scale-[0.98]";
   const theme =
     variant === "primary"
-      ? "bg-blue-600 text-white hover:shadow-md"
+      ? "bg-lightblue-600 text-white hover:shadow-md"
       : variant === "danger"
       ? "bg-rose-500 text-white hover:shadow-md"
       : "bg-white border border-gray-200 hover:shadow-sm";
@@ -463,9 +463,9 @@ export default function Dashboard() {
                 </div>
               </form>
 
-              {/* My Leaves */}
+              {/* Leave Applications */}
               <div ref={myLeavesRef} className="mt-6">
-                <div className="font-medium mb-3">📋 My Leaves</div>
+                <div className="font-medium mb-3">📋 Leave Application</div>
                 <div className="space-y-2">
                   {mine.length === 0 && <div className="text-sm text-slate-500">No leaves yet.</div>}
                   {mine.map((l) => (
