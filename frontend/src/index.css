@@ -27,6 +27,16 @@
 .spin { animation: spin .9s linear infinite; }
 
 
+/* Soft neumorphism panel for sidebar */
+.soft-panel {
+  background: linear-gradient(180deg, #eaf3ff, #f7fbff);
+  box-shadow:
+    6px 6px 14px rgba(0,0,0,.06),
+    -6px -6px 14px rgba(255,255,255,.6);
+}
+.card { @apply bg-card rounded-soft shadow-soft border border-border; }
+
+
 *{box-sizing:border-box}
 html,body,#root{height:100%}
 body{
