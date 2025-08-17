@@ -32,7 +32,7 @@ function AButton({ variant = "primary", className = "", children, ...rest }) {
     "focus:outline-none focus:ring-2 focus:ring-blue-400 hover:scale-[1.02] active:scale-[0.98]";
   const theme =
     variant === "primary"
-      ? "bg-lightblue-600 text-white hover:shadow-md"
+      ? "bg-gradient-to-r from-sky-400 to-blue-500 text-white hover:from-sky-500 hover:to-blue-600 hover:shadow-md"
       : variant === "danger"
       ? "bg-rose-500 text-white hover:shadow-md"
       : "bg-white border border-gray-200 hover:shadow-sm";
