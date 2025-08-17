@@ -13,19 +13,6 @@
 }
 
 @import "tailwindcss";
-/* tiny helpers for the login glass look */
-.login-glass {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.18);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-  background-image: radial-gradient(380px 220px at 50% 40%, rgba(124,58,237,.26), rgba(15,23,42,.65) 70%);
-}
-@keyframes cardPulse { 0%{box-shadow:0 0 0 0 rgba(124,58,237,.28)} 70%{box-shadow:0 0 0 12px rgba(124,58,237,0)} 100%{box-shadow:0 0 0 0 rgba(124,58,237,0)} }
-.pulse { animation: cardPulse 1.8s ease-out infinite; }
-@keyframes spin { to { transform: rotate(360deg) } }
-.spin { animation: spin .9s linear infinite; }
-
 
 /* Soft neumorphism panel for sidebar */
 .soft-panel {
